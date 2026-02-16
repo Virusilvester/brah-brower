@@ -176,19 +176,21 @@ function App(): React.JSX.Element {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
       {/* 🔥 CUSTOM TITLEBAR */}
       <div
-        style={{
-          height: '35px',
-          background: '#111',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '0 10px',
-          WebkitAppRegion: 'drag' as unknown
-        }}
+        style={
+          {
+            height: '35px',
+            background: '#111',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '0 10px',
+            WebkitAppRegion: 'drag'
+          } as any
+        }
       >
         <div style={{ color: 'white', fontWeight: 'bold' }}>{activeTab.title}</div>
 
-        <div style={{ display: 'flex', gap: '10px', WebkitAppRegion: 'no-drag' as unknown }}>
+        <div style={{ display: 'flex', gap: '10px', WebkitAppRegion: 'no-drag' } as any}>
           <button onClick={() => window.api.minimize()}>—</button>
           <button onClick={() => window.api.maximize()}>☐</button>
           <button onClick={() => window.api.close()}>✕</button>
@@ -321,15 +323,14 @@ function App(): React.JSX.Element {
         {tabs.map((tab) => (
           <webview
             key={tab.id}
-            ref={(el) => {
-              webviewRefs.current[tab.id] = el
-            }}
+            ref={(el: any) => (webviewRefs.current[tab.id] = el)}
             src={tab.url}
             style={{
               width: '100%',
               height: '100%',
               display: tab.id === activeTabId ? 'flex' : 'none'
             }}
+            // @ts-ignore
             onDidFinishLoad={() => handleDidFinishLoad(tab.id)}
           />
         ))}
