@@ -30,7 +30,7 @@ function App(): React.JSX.Element {
 
   const webviewRefs = useRef<{ [key: number]: any }>({})
 
-  const activeTab = tabs.find((t) => t.id === activeTabId)!
+  //const activeTab = tabs.find((t) => t.id === activeTabId)!
 
   const [history, setHistory] = useState<HistoryItem[]>([])
   const [bookmarks, setBookmarks] = useState<BookmarkItem[]>([])
