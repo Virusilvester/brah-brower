@@ -47,8 +47,8 @@
     "vite": "^7.2.6"
   },
   "build": {
-    "appId": "com.kimi.desktop",
-    "productName": "Kimi Desktop",
+    "appId": "com.brah.browser",
+    "productName": "Brah Browser",
     "directories": {
       "output": "dist"
     },
@@ -63,6 +63,7 @@
       }
     ],
     "win": {
+      "icon": "src/renderer/assets/icon.ico",
       "target": [
         {
           "target": "nsis",
@@ -78,6 +79,7 @@
       "allowToChangeInstallationDirectory": true
     },
     "linux": {
+      "icon": "src/renderer/assets/icon.png",
       "target": [
         {
           "target": "AppImage",

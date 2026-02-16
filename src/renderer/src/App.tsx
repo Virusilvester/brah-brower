@@ -188,7 +188,7 @@ function App(): React.JSX.Element {
           } as any
         }
       >
-        <div style={{ color: 'white', fontWeight: 'bold' }}>{activeTab.title}</div>
+        <div style={{ color: 'white', fontWeight: 'bold' }}>{'Brah Browser'}</div>
 
         <div style={{ display: 'flex', gap: '10px', WebkitAppRegion: 'no-drag' } as any}>
           <button onClick={() => window.api.minimize()}>—</button>
