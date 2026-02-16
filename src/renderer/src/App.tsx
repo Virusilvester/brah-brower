@@ -183,12 +183,12 @@ function App(): React.JSX.Element {
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: '0 10px',
-          WebkitAppRegion: 'drag'
+          WebkitAppRegion: 'drag' as unknown
         }}
       >
         <div style={{ color: 'white', fontWeight: 'bold' }}>{activeTab.title}</div>
 
-        <div style={{ display: 'flex', gap: '10px', WebkitAppRegion: 'no-drag' }}>
+        <div style={{ display: 'flex', gap: '10px', WebkitAppRegion: 'no-drag' as unknown }}>
           <button onClick={() => window.api.minimize()}>—</button>
           <button onClick={() => window.api.maximize()}>☐</button>
           <button onClick={() => window.api.close()}>✕</button>
@@ -321,7 +321,9 @@ function App(): React.JSX.Element {
         {tabs.map((tab) => (
           <webview
             key={tab.id}
-            ref={(el) => (webviewRefs.current[tab.id] = el)}
+            ref={(el) => {
+              webviewRefs.current[tab.id] = el
+            }}
             src={tab.url}
             style={{
               width: '100%',
