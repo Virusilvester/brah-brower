@@ -10,7 +10,7 @@ function createWindow(): void {
       preload: path.join(__dirname, '../preload/index.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      webviewTag: true // 👈 IMPORTANT
+      webviewTag: true
     }
   })
 
@@ -33,7 +33,7 @@ function createWindow(): void {
     BrowserWindow.getFocusedWindow()?.close()
   })
 
-  session.defaultSession.on('will-download', (event, item) => {
+  session.defaultSession.on('will-download', (_event, item) => {
     const fileName = item.getFilename()
 
     const savePath = path.join(app.getPath('downloads'), fileName)
