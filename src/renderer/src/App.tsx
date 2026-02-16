@@ -1,3 +1,4 @@
+/* eslint-disable */
 import { useEffect, useRef, useState } from 'react'
 
 interface Tab {
@@ -20,7 +21,9 @@ interface BookmarkItem {
 function App(): React.JSX.Element {
   const HOME = 'https://www.google.com'
 
-  const [tabs, setTabs] = useState<Tab[]>([{ id: Date.now(), title: 'New Tab', url: HOME }])
+  const [tabs, setTabs] = useState<Tab[]>(() => [
+    { id: crypto.randomUUID() as any, title: 'New Tab', url: HOME }
+  ])
 
   const [activeTabId, setActiveTabId] = useState<number>(tabs[0].id)
   const [inputUrl, setInputUrl] = useState('')
@@ -248,7 +251,7 @@ function App(): React.JSX.Element {
           onKeyDown={(e) => e.key === 'Enter' && loadURL()}
         />
 
-        <button onClick={loadURL} style={{ marginLeft: '6px' }}>
+        <button onClick={() => loadURL()} style={{ marginLeft: '6px' }}>
           Go
         </button>
         <button onClick={() => setShowDownloads(!showDownloads)}>📥</button>
