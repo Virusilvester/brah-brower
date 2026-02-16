@@ -8,7 +8,7 @@ It features a custom titlebar, history, bookmarks, and a download manager.
 ## Download
 
 You can download the latest builds from the GitHub Releases section:  
-[Releases](https://github.com/Virusilver/brah-browser/releases)
+[Releases](https://github.com/ViruSilvesteR/brah-browser/releases)
 
 Available for:
 
