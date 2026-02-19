@@ -80,7 +80,6 @@ function WebViewInstance({
       'page-favicon-updated': (e) => {
         if (e.favicons?.[0]) onFaviconChange(tab.id, e.favicons[0])
       },
-      // CRITICAL: Prevent external opening
       'new-window': (e) => {
         e.preventDefault()
         if (e.url && e.url !== 'about:blank') {
@@ -92,7 +91,6 @@ function WebViewInstance({
         }
       },
       'will-navigate': (e) => {
-        // Allow normal navigation but track it
         onUrlChange(tab.id, e.url)
       },
       'dom-ready': () => {
@@ -117,25 +115,48 @@ function WebViewInstance({
     }
   }, [tab.id])
 
-  // Handle URL changes
+  // CRITICAL FIX: Handle visibility and URL updates when active state changes
   useEffect(() => {
     const webview = webviewRef.current
-    if (!webview || !isActive) return
+    if (!webview) return
 
-    try {
-      const current = webview.getURL()
-      if (current !== tab.url && !webview.isLoading()) {
+    if (isActive) {
+      // Make visible
+      webview.style.display = 'flex'
+      webview.style.zIndex = '1'
+
+      // Force URL check when becoming active
+      try {
+        const currentUrl = webview.getURL()
+        if (currentUrl !== tab.url) {
+          webview.src = tab.url
+        }
+      } catch (e) {
         webview.src = tab.url
       }
-    } catch (e) {}
-  }, [tab.url, isActive])
+    } else {
+      // Hide when not active
+      webview.style.display = 'none'
+      webview.style.zIndex = '0'
+    }
+  }, [isActive, tab.url])
 
   return (
     <webview
       ref={webviewRef}
       src={tab.url}
       className="webview"
-      allowpopups="true" // Allow but we handle them
+      style={{
+        display: isActive ? 'flex' : 'none',
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        width: '100%',
+        height: '100%',
+        border: 'none',
+        background: 'white'
+      }}
+      allowpopups="true"
       nodeintegration="false"
       webpreferences="contextIsolation=true,nodeIntegration=false"
       partition="persist:webcontent"

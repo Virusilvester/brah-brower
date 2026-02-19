@@ -35,6 +35,7 @@ function App(): JSX.Element {
     addTab,
     closeTab,
     setActiveTab,
+    reorderTabs,
     updateTab,
     updateTabLoading,
     updateTabNavigationState
@@ -112,6 +113,7 @@ function App(): JSX.Element {
         onTabSelect={setActiveTab}
         onTabClose={closeTab}
         onAddTab={() => addTab()}
+        onReorderTabs={reorderTabs}
       />
 
       <NavigationBar

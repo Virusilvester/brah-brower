@@ -9,7 +9,6 @@ export function useBrowserState() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved)
-        // Ensure all tabs have valid URLs
         return parsed.map((t: Tab) => ({
           ...t,
           url: t.url || HOME_URL
@@ -32,7 +31,7 @@ export function useBrowserState() {
     const newTab: Tab = {
       id: crypto.randomUUID(),
       title: 'New Tab',
-      url: url || HOME_URL // Ensure URL is never empty
+      url: url || HOME_URL
     }
     setTabs((prev) => [...prev, newTab])
     setActiveTabId(newTab.id)
@@ -41,10 +40,9 @@ export function useBrowserState() {
   const closeTab = useCallback(
     (id: string) => {
       setTabs((prev) => {
-        // If it's the last tab, reset it to home instead of closing
         if (prev.length === 1) {
           const resetTab: Tab = {
-            id: crypto.randomUUID(), // New ID forces webview remount
+            id: crypto.randomUUID(),
             title: 'New Tab',
             url: HOME_URL
           }
@@ -64,6 +62,19 @@ export function useBrowserState() {
 
   const setActiveTab = useCallback((id: string) => {
     setActiveTabId(id)
+  }, [])
+
+  // NEW: Reorder tabs
+  const reorderTabs = useCallback((dragIndex: number, hoverIndex: number) => {
+    setTabs((prev) => {
+      const dragTab = prev[dragIndex]
+      const newTabs = [...prev]
+      // Remove dragged tab
+      newTabs.splice(dragIndex, 1)
+      // Insert at new position
+      newTabs.splice(hoverIndex, 0, dragTab)
+      return newTabs
+    })
   }, [])
 
   const updateTab = useCallback((id: string, updates: Partial<Tab>) => {
@@ -89,6 +100,7 @@ export function useBrowserState() {
     addTab,
     closeTab,
     setActiveTab,
+    reorderTabs, // Export new function
     updateTab,
     updateTabLoading,
     updateTabNavigationState
