@@ -1,8 +1,35 @@
-import { app, BrowserWindow, ipcMain, session, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, session, shell, screen } from 'electron'
 import path from 'path'
 import { fileURLToPath } from 'url'
 
+import StoreModule from 'electron-store'
+const Store = StoreModule.default || StoreModule
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
+
+// Window state interface
+interface WindowState {
+  width: number
+  height: number
+  x: number | undefined
+  y: number | undefined
+  isMaximized: boolean
+  isFullScreen: boolean
+}
+
+// Initialize store with defaults
+const store = new Store<WindowState>({
+  name: 'window-state',
+  defaults: {
+    width: 1400,
+    height: 900,
+    x: undefined,
+    y: undefined,
+    isMaximized: false,
+    isFullScreen: false
+  }
+})
+
 const windows = new Set<BrowserWindow>()
 
 interface DownloadItem {
@@ -18,24 +45,91 @@ interface DownloadItem {
 const activeDownloads = new Map<string, DownloadItem>()
 
 function createWindow(): BrowserWindow {
+  // Get saved state
+  const savedState = store.store as WindowState
+  let { width, height, x, y, isMaximized } = savedState
+
+  // Ensure window is within screen bounds
+  const primaryDisplay = screen.getPrimaryDisplay()
+  const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize
+
+  // Validate position is on screen (with 50px tolerance)
+  let validX = x
+  let validY = y
+
+  if (validX !== undefined && validY !== undefined) {
+    const isOffScreen =
+      validX < -50 || // Left edge too far off
+      validY < -50 || // Top edge too far off
+      validX > screenWidth - 100 || // Too far right (at least 100px should be visible)
+      validY > screenHeight - 100 // Too far down (at least 100px should be visible)
+
+    if (isOffScreen) {
+      // Center on screen if off-screen
+      validX = Math.round((screenWidth - width) / 2)
+      validY = Math.round((screenHeight - height) / 2)
+    }
+  } else {
+    // Center if no position saved
+    validX = Math.round((screenWidth - width) / 2)
+    validY = Math.round((screenHeight - height) / 2)
+  }
+
   const mainWindow = new BrowserWindow({
-    width: 1400,
-    height: 900,
+    width,
+    height,
+    x: validX,
+    y: validY,
     minWidth: 800,
     minHeight: 600,
     frame: false,
     titleBarStyle: 'hidden',
+    show: false, // Don't show until ready to prevent visual flash
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
       contextIsolation: true,
       nodeIntegration: false,
       webviewTag: true,
       allowRunningInsecureContent: false
-    },
-    show: false
+    }
   })
 
   windows.add(mainWindow)
+
+  // Restore maximized state (do this before showing)
+  if (isMaximized && !mainWindow.isMaximized()) {
+    mainWindow.maximize()
+  }
+
+  // Save window state on changes (debounced)
+  let saveTimeout: NodeJS.Timeout
+
+  const saveState = () => {
+    // Get normal bounds (un-maximized size) so we can restore properly
+    const bounds = mainWindow.getNormalBounds()
+    const state: WindowState = {
+      width: bounds.width,
+      height: bounds.height,
+      x: bounds.x,
+      y: bounds.y,
+      isMaximized: mainWindow.isMaximized(),
+      isFullScreen: mainWindow.isFullScreen()
+    }
+    store.set(state)
+  }
+
+  const debouncedSave = () => {
+    clearTimeout(saveTimeout)
+    saveTimeout = setTimeout(saveState, 100)
+  }
+
+  // Save on various window events
+  mainWindow.on('resize', debouncedSave)
+  mainWindow.on('move', debouncedSave)
+  mainWindow.on('maximize', saveState)
+  mainWindow.on('unmaximize', saveState)
+  mainWindow.on('enter-full-screen', saveState)
+  mainWindow.on('leave-full-screen', saveState)
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show()
@@ -44,6 +138,7 @@ function createWindow(): BrowserWindow {
 
   mainWindow.on('closed', () => {
     windows.delete(mainWindow)
+    clearTimeout(saveTimeout)
   })
 
   setupWindowControls(mainWindow)
@@ -128,19 +223,15 @@ function setupDownloadHandling(window: BrowserWindow): void {
 }
 
 function setupExternalLinks(window: BrowserWindow): void {
-  // Only handle main window navigation, not webview popups
   window.webContents.setWindowOpenHandler(({ url, disposition, frameName, features }) => {
-    // If it's from a webview (disposition will be new-window/foreground-tab for popups)
-    // Allow it to create a popup window
     if (disposition === 'new-window' || disposition === 'foreground-tab') {
-      // Create a new popup window for OAuth/login
       return {
         action: 'allow',
         overrideBrowserWindowOptions: {
           width: 500,
           height: 600,
-          frame: true, // Show frame for popups so user can close them
-          parent: window, // Make it modal to main window
+          frame: true,
+          parent: window,
           webPreferences: {
             contextIsolation: true,
             nodeIntegration: false,
@@ -150,12 +241,10 @@ function setupExternalLinks(window: BrowserWindow): void {
       }
     }
 
-    // For background tabs or other cases, deny and open externally if needed
     shell.openExternal(url)
     return { action: 'deny' }
   })
 
-  // Prevent main window navigation
   window.webContents.on('will-navigate', (event, url) => {
     if (url !== window.webContents.getURL()) {
       event.preventDefault()
@@ -174,14 +263,9 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
 })
 
-// Handle webview popups - CRITICAL FIX
 app.on('web-contents-created', (_event, contents) => {
-  // Check if this is a webview
-  const isWebview = contents.getType() === 'webview'
-
-  if (isWebview) {
+  if (contents.getType() === 'webview') {
     contents.setWindowOpenHandler(({ url, disposition, frameName }) => {
-      // For OAuth popups, allow them to open in a new BrowserWindow
       if (disposition === 'new-window' || frameName === '_blank') {
         return {
           action: 'allow',
@@ -198,8 +282,6 @@ app.on('web-contents-created', (_event, contents) => {
         }
       }
 
-      // For other cases, open in new tab of main browser
-      // Send message to renderer to open in new tab
       const mainWindow = BrowserWindow.fromWebContents(contents.hostWebContents)
       if (mainWindow) {
         mainWindow.webContents.send('webview-new-tab', url)
