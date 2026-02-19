@@ -128,17 +128,37 @@ function setupDownloadHandling(window: BrowserWindow): void {
 }
 
 function setupExternalLinks(window: BrowserWindow): void {
-  // Handle window.open from webview
-  window.webContents.setWindowOpenHandler(({ url }) => {
+  // Only handle main window navigation, not webview popups
+  window.webContents.setWindowOpenHandler(({ url, disposition, frameName, features }) => {
+    // If it's from a webview (disposition will be new-window/foreground-tab for popups)
+    // Allow it to create a popup window
+    if (disposition === 'new-window' || disposition === 'foreground-tab') {
+      // Create a new popup window for OAuth/login
+      return {
+        action: 'allow',
+        overrideBrowserWindowOptions: {
+          width: 500,
+          height: 600,
+          frame: true, // Show frame for popups so user can close them
+          parent: window, // Make it modal to main window
+          webPreferences: {
+            contextIsolation: true,
+            nodeIntegration: false,
+            sandbox: true
+          }
+        }
+      }
+    }
+
+    // For background tabs or other cases, deny and open externally if needed
     shell.openExternal(url)
     return { action: 'deny' }
   })
 
-  // Handle navigation that tries to leave the site
+  // Prevent main window navigation
   window.webContents.on('will-navigate', (event, url) => {
     if (url !== window.webContents.getURL()) {
       event.preventDefault()
-      shell.openExternal(url)
     }
   })
 }
@@ -154,11 +174,37 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
 })
 
-// Security: Prevent new window creation from webview
+// Handle webview popups - CRITICAL FIX
 app.on('web-contents-created', (_event, contents) => {
-  // This handles window.open from webviews
-  contents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url)
-    return { action: 'deny' }
-  })
+  // Check if this is a webview
+  const isWebview = contents.getType() === 'webview'
+
+  if (isWebview) {
+    contents.setWindowOpenHandler(({ url, disposition, frameName }) => {
+      // For OAuth popups, allow them to open in a new BrowserWindow
+      if (disposition === 'new-window' || frameName === '_blank') {
+        return {
+          action: 'allow',
+          overrideBrowserWindowOptions: {
+            width: 500,
+            height: 600,
+            frame: true,
+            webPreferences: {
+              contextIsolation: true,
+              nodeIntegration: false,
+              sandbox: true
+            }
+          }
+        }
+      }
+
+      // For other cases, open in new tab of main browser
+      // Send message to renderer to open in new tab
+      const mainWindow = BrowserWindow.fromWebContents(contents.hostWebContents)
+      if (mainWindow) {
+        mainWindow.webContents.send('webview-new-tab', url)
+      }
+      return { action: 'deny' }
+    })
+  }
 })
