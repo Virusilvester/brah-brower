@@ -1,0 +1,28 @@
+.webview-container {
+  flex: 1;
+  position: relative;
+  background: var(--bg-primary);
+}
+
+.webview-wrapper {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+
+.webview-wrapper.active {
+  visibility: visible;
+  opacity: 1;
+  z-index: 1;
+}
+
+.webview {
+  width: 100%;
+  height: 100%;
+  border: none;
+}

@@ -1,370 +1,189 @@
-/* eslint-disable */
-import { useEffect, useRef, useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { TabBar } from './components/TabBar'
+import { NavigationBar } from './components/NavigationBar'
+import { TitleBar } from './components/TitleBar'
+import { HistoryPanel } from './components/HistoryPanel'
+import { BookmarksPanel } from './components/BookmarksPanel'
+import { DownloadsPanel } from './components/DownloadsPanel'
+import { SettingsPanel } from './components/SettingsPanel'
+import { WebViewContainer } from './components/WebViewContainer'
+import { useBrowserState } from './hooks/useBrowserState'
+import { useHistory } from './hooks/useHistory'
+import { useBookmarks } from './hooks/useBookmarks'
+import { useDownloads } from './hooks/useDownloads'
+import './styles/App.css'
 
-interface Tab {
-  id: number
+export interface Tab {
+  id: string
   title: string
   url: string
+  favicon?: string
+  isLoading?: boolean
+  canGoBack?: boolean
+  canGoForward?: boolean
 }
 
-interface HistoryItem {
-  title: string
-  url: string
-  time: number
-}
+export type PanelType = 'history' | 'bookmarks' | 'downloads' | 'settings' | null
 
-interface BookmarkItem {
-  title: string
-  url: string
-}
+function App(): JSX.Element {
+  const [activePanel, setActivePanel] = useState<PanelType>(null)
+  const [isMaximized, setIsMaximized] = useState(false)
 
-function App(): React.JSX.Element {
-  const HOME = 'https://www.google.com'
+  const {
+    tabs,
+    activeTabId,
+    addTab,
+    closeTab,
+    setActiveTab,
+    updateTab,
+    updateTabLoading,
+    updateTabNavigationState
+  } = useBrowserState()
 
-  const [tabs, setTabs] = useState<Tab[]>(() => [
-    { id: crypto.randomUUID() as any, title: 'New Tab', url: HOME }
-  ])
+  const { history, addToHistory, clearHistory, removeFromHistory } = useHistory()
 
-  const [activeTabId, setActiveTabId] = useState<number>(tabs[0].id)
-  const [inputUrl, setInputUrl] = useState('')
+  const {
+    bookmarks,
+    removeBookmark, // For removing from panel
+    isBookmarked,
+    toggleBookmark // Use toggle instead of add
+  } = useBookmarks()
 
-  const webviewRefs = useRef<{ [key: number]: any }>({})
+  const { downloads, clearCompletedDownloads } = useDownloads()
 
-  //const activeTab = tabs.find((t) => t.id === activeTabId)!
+  const activeTab = tabs.find((t) => t.id === activeTabId) || tabs[0]
 
-  const [history, setHistory] = useState<HistoryItem[]>([])
-  const [bookmarks, setBookmarks] = useState<BookmarkItem[]>([])
-  const [showHistory, setShowHistory] = useState(false)
-  const [showBookmarks, setShowBookmarks] = useState(false)
-
-  const [downloads, setDownloads] = useState<any[]>([])
-  const [showDownloads, setShowDownloads] = useState(false)
-
-  // 🔥 Load saved data
   useEffect(() => {
-    const savedHistory = localStorage.getItem('brah-history')
-    const savedBookmarks = localStorage.getItem('brah-bookmarks')
-
-    if (savedHistory) setHistory(JSON.parse(savedHistory))
-    if (savedBookmarks) setBookmarks(JSON.parse(savedBookmarks))
-    window.downloads.onProgress((data) => {
-      setDownloads((prev) => {
-        const existing = prev.find((d) => d.fileName === data.fileName)
-
-        if (existing) {
-          return prev.map((d) =>
-            d.fileName === data.fileName ? { ...d, progress: data.progress } : d
-          )
-        }
-
-        return [...prev, { fileName: data.fileName, progress: data.progress }]
-      })
-    })
-
-    window.downloads.onComplete((data) => {
-      setDownloads((prev) =>
-        prev.map((d) =>
-          d.fileName === data.fileName ? { ...d, progress: 100, completed: true } : d
-        )
-      )
-    })
+    window.windowControls?.onMaximizedChange?.(setIsMaximized)
   }, [])
 
-  // 🔥 Add new tab
-  const addTab = () => {
-    const newTab: Tab = {
-      id: Date.now(),
-      title: 'New Tab',
-      url: HOME
+  const handleNavigate = useCallback(
+    (url: string) => {
+      if (!activeTabId) return
+      updateTab(activeTabId, { url })
+      addToHistory(activeTab?.title || 'New Tab', url)
+    },
+    [activeTabId, updateTab, addToHistory, activeTab?.title]
+  )
+
+  const handleLoadURL = useCallback(
+    (input: string) => {
+      const url = normalizeUrl(input)
+      handleNavigate(url)
+    },
+    [handleNavigate]
+  )
+
+  const handleGoBack = useCallback(() => {
+    // Handled by webview
+  }, [])
+
+  const handleGoForward = useCallback(() => {
+    // Handled by webview
+  }, [])
+
+  const handleReload = useCallback(() => {
+    // Handled by webview
+  }, [])
+
+  // CHANGED: Use toggle instead of just add
+  const handleToggleBookmark = useCallback(() => {
+    if (activeTab) {
+      toggleBookmark(activeTab.title, activeTab.url)
     }
+  }, [activeTab, toggleBookmark])
 
-    setTabs((prev) => [...prev, newTab])
-    setActiveTabId(newTab.id)
-    setInputUrl('')
-  }
-
-  // 🔥 Close tab
-  const closeTab = (id: number) => {
-    if (tabs.length === 1) return
-
-    const newTabs = tabs.filter((t) => t.id !== id)
-    setTabs(newTabs)
-
-    if (id === activeTabId) {
-      setActiveTabId(newTabs[0].id)
-    }
-  }
-
-  // 🔥 Load URL
-  const loadURL = (customUrl?: string) => {
-    let value = customUrl ?? inputUrl
-    value = value.trim()
-
-    if (!value) return
-
-    // If it already has protocol
-    if (value.startsWith('http://') || value.startsWith('https://')) {
-      updateTab(value)
-      return
-    }
-
-    // If it looks like a domain (contains dot and no spaces)
-    const looksLikeDomain = value.includes('.') && !value.includes(' ') && !value.startsWith(' ')
-
-    if (looksLikeDomain) {
-      updateTab('https://' + value)
-    } else {
-      updateTab('https://www.google.com/search?q=' + encodeURIComponent(value))
-    }
-  }
-
-  const updateTab = (url: string) => {
-    setTabs((prev) => prev.map((tab) => (tab.id === activeTabId ? { ...tab, url } : tab)))
-  }
-
-  const goBack = () => webviewRefs.current[activeTabId]?.goBack()
-  const goForward = () => webviewRefs.current[activeTabId]?.goForward()
-  const reload = () => webviewRefs.current[activeTabId]?.reload()
-
-  // 🔥 Handle page load events (history + title update)
-  const handleDidFinishLoad = (tabId: number) => {
-    const webview = webviewRefs.current[tabId]
-    if (!webview) return
-
-    const title = webview.getTitle()
-    const url = webview.getURL()
-
-    // Update tab title
-    setTabs((prev) => prev.map((tab) => (tab.id === tabId ? { ...tab, title, url } : tab)))
-
-    // Prevent duplicate consecutive history entries
-    setHistory((prev) => {
-      if (prev.length > 0 && prev[0].url === url) {
-        return prev
-      }
-
-      const newEntry: HistoryItem = {
-        title,
-        url,
-        time: Date.now()
-      }
-
-      const updated = [newEntry, ...prev]
-      localStorage.setItem('brah-history', JSON.stringify(updated))
-      return updated
-    })
-  }
-
-  // 🔥 Add bookmark
-  const addBookmark = () => {
-    const webview = webviewRefs.current[activeTabId]
-    if (!webview) return
-
-    const newBookmark: BookmarkItem = {
-      title: webview.getTitle(),
-      url: webview.getURL()
-    }
-
-    setBookmarks((prev) => {
-      const updated = [...prev, newBookmark]
-      localStorage.setItem('brah-bookmarks', JSON.stringify(updated))
-      return updated
-    })
-  }
+  const togglePanel = useCallback((panel: PanelType) => {
+    setActivePanel((current) => (current === panel ? null : panel))
+  }, [])
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
-      {/* 🔥 CUSTOM TITLEBAR */}
-      <div
-        style={
-          {
-            height: '35px',
-            background: '#111',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '0 10px',
-            WebkitAppRegion: 'drag'
-          } as any
-        }
-      >
-        <div style={{ color: 'white', fontWeight: 'bold' }}>{'Brah Browser'}</div>
+    <div className="app">
+      <TitleBar
+        isMaximized={isMaximized}
+        onMinimize={() => window.windowControls?.minimize()}
+        onMaximize={() => window.windowControls?.maximize()}
+        onClose={() => window.windowControls?.close()}
+      />
 
-        <div style={{ display: 'flex', gap: '10px', WebkitAppRegion: 'no-drag' } as any}>
-          <button onClick={() => window.api.minimize()}>—</button>
-          <button onClick={() => window.api.maximize()}>☐</button>
-          <button onClick={() => window.api.close()}>✕</button>
-        </div>
-      </div>
+      <TabBar
+        tabs={tabs}
+        activeTabId={activeTabId}
+        onTabSelect={setActiveTab}
+        onTabClose={closeTab}
+        onAddTab={() => addTab()}
+      />
 
-      {/* 🔥 TAB BAR */}
-      <div style={{ display: 'flex', background: '#111', padding: '4px' }}>
-        {tabs.map((tab) => (
-          <div
-            key={tab.id}
-            onClick={() => {
-              setActiveTabId(tab.id)
-              setInputUrl(tab.url)
-            }}
-            style={{
-              padding: '6px 12px',
-              marginRight: '4px',
-              background: tab.id === activeTabId ? '#333' : '#222',
-              color: 'white',
-              cursor: 'pointer',
-              borderRadius: '4px',
-              display: 'flex',
-              alignItems: 'center'
-            }}
-          >
-            <span style={{ marginRight: '8px' }}>{tab.title}</span>
+      <NavigationBar
+        url={activeTab?.url || ''}
+        canGoBack={activeTab?.canGoBack}
+        canGoForward={activeTab?.canGoForward}
+        isLoading={activeTab?.isLoading}
+        isBookmarked={isBookmarked(activeTab?.url || '')}
+        onBack={handleGoBack}
+        onForward={handleGoForward}
+        onReload={handleReload}
+        onNavigate={handleLoadURL}
+        onToggleBookmark={handleToggleBookmark} // Changed prop name
+        onShowHistory={() => togglePanel('history')}
+        onShowBookmarks={() => togglePanel('bookmarks')}
+        onShowDownloads={() => togglePanel('downloads')}
+        onShowSettings={() => togglePanel('settings')}
+      />
 
-            <span
-              onClick={(e) => {
-                e.stopPropagation()
-                closeTab(tab.id)
-              }}
-              style={{ color: 'red', cursor: 'pointer' }}
-            >
-              ✕
-            </span>
-          </div>
-        ))}
-
-        <button onClick={addTab}>＋</button>
-      </div>
-
-      {/* 🔥 NAV BAR */}
-      <div style={{ display: 'flex', padding: '8px', background: '#181818' }}>
-        <button onClick={goBack}>⬅</button>
-        <button onClick={goForward}>➡</button>
-        <button onClick={reload}>🔄</button>
-
-        <input
-          style={{
-            flex: 1,
-            marginLeft: '8px',
-            padding: '6px',
-            borderRadius: '4px',
-            border: 'none'
+      <div className="content-area">
+        <WebViewContainer
+          tabs={tabs}
+          activeTabId={activeTabId}
+          onTitleChange={(tabId, title) => updateTab(tabId, { title })}
+          onFaviconChange={(tabId, favicon) => updateTab(tabId, { favicon })}
+          onUrlChange={(tabId, url) => {
+            updateTab(tabId, { url })
+            const tab = tabs.find((t) => t.id === tabId)
+            if (tab) addToHistory(tab.title, url)
           }}
-          value={inputUrl}
-          onChange={(e) => setInputUrl(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && loadURL()}
+          onLoadingChange={updateTabLoading}
+          onNavigationStateChange={updateTabNavigationState}
         />
 
-        <button onClick={() => loadURL()} style={{ marginLeft: '6px' }}>
-          Go
-        </button>
-        <button onClick={() => setShowDownloads(!showDownloads)}>📥</button>
-
-        <button onClick={addBookmark} style={{ marginLeft: '6px' }}>
-          ⭐
-        </button>
-
-        <button onClick={() => setShowHistory(!showHistory)}>📜</button>
-        <button onClick={() => setShowBookmarks(!showBookmarks)}>📂</button>
-      </div>
-
-      {/* 🔥 HISTORY PANEL */}
-      {showHistory && (
-        <div style={panelStyle}>
-          <h3>History</h3>
-          {history.map((item, index) => (
-            <div
-              key={index}
-              style={itemStyle}
-              onClick={() => {
-                setShowHistory(false)
-                loadURL(item.url)
-              }}
-            >
-              {item.title}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* 🔥 BOOKMARK PANEL */}
-      {showBookmarks && (
-        <div style={panelStyle}>
-          <h3>Bookmarks</h3>
-          {bookmarks.map((item, index) => (
-            <div
-              key={index}
-              style={{ ...itemStyle, display: 'flex', justifyContent: 'space-between' }}
-            >
-              <span
-                onClick={() => {
-                  setShowBookmarks(false)
-                  loadURL(item.url)
+        {activePanel && (
+          <div className="side-panel">
+            {activePanel === 'history' && (
+              <HistoryPanel
+                history={history}
+                onItemClick={(url) => {
+                  handleNavigate(url)
+                  setActivePanel(null)
                 }}
-              >
-                {item.title}
-              </span>
+                onClear={clearHistory}
+                onRemove={removeFromHistory}
+                onClose={() => setActivePanel(null)}
+              />
+            )}
 
-              <span
-                style={{ color: 'red', cursor: 'pointer' }}
-                onClick={() => {
-                  const updated = bookmarks.filter((_, i) => i !== index)
-                  setBookmarks(updated)
-                  localStorage.setItem('brah-bookmarks', JSON.stringify(updated))
+            {activePanel === 'bookmarks' && (
+              <BookmarksPanel
+                bookmarks={bookmarks}
+                onItemClick={(url) => {
+                  handleNavigate(url)
+                  setActivePanel(null)
                 }}
-              >
-                ✕
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
+                onRemove={removeBookmark} // Pass remove function
+                onClose={() => setActivePanel(null)}
+              />
+            )}
 
-      {/* 🔥 WEBVIEWS */}
-      <div style={{ flex: 1 }}>
-        {tabs.map((tab) => (
-          <webview
-            key={tab.id}
-            ref={(el: any) => (webviewRefs.current[tab.id] = el)}
-            src={tab.url}
-            style={{
-              width: '100%',
-              height: '100%',
-              display: tab.id === activeTabId ? 'flex' : 'none'
-            }}
-            // @ts-ignore
-            onDidFinishLoad={() => handleDidFinishLoad(tab.id)}
-          />
-        ))}
+            {activePanel === 'downloads' && (
+              <DownloadsPanel
+                downloads={downloads}
+                onOpenFile={(path) => window.downloads?.openFile(path)}
+                onShowInFolder={(path) => window.downloads?.showInFolder(path)}
+                onClearCompleted={clearCompletedDownloads}
+                onClose={() => setActivePanel(null)}
+              />
+            )}
 
-        {showDownloads && (
-          <div style={panelStyle}>
-            <h3>Downloads</h3>
-
-            {downloads.length === 0 && <p>No downloads yet</p>}
-
-            {downloads.map((item, index) => (
-              <div key={index} style={{ marginBottom: '10px' }}>
-                <div>{item.fileName}</div>
-
-                <div
-                  style={{
-                    height: '6px',
-                    background: '#333',
-                    borderRadius: '3px',
-                    overflow: 'hidden'
-                  }}
-                >
-                  <div
-                    style={{
-                      width: `${item.progress || 0}%`,
-                      height: '100%',
-                      background: item.completed ? 'limegreen' : 'dodgerblue'
-                    }}
-                  />
-                </div>
-
-                <small>{item.progress || 0}%</small>
-              </div>
-            ))}
+            {activePanel === 'settings' && <SettingsPanel onClose={() => setActivePanel(null)} />}
           </div>
         )}
       </div>
@@ -372,22 +191,18 @@ function App(): React.JSX.Element {
   )
 }
 
-const panelStyle: React.CSSProperties = {
-  position: 'absolute',
-  top: '120px',
-  right: '10px',
-  width: '300px',
-  height: '400px',
-  background: '#1e1e1e',
-  overflowY: 'auto',
-  padding: '10px',
-  zIndex: 999,
-  color: 'white'
-}
+function normalizeUrl(input: string): string {
+  const trimmed = input.trim()
 
-const itemStyle: React.CSSProperties = {
-  marginBottom: '8px',
-  cursor: 'pointer'
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    return trimmed
+  }
+
+  if (trimmed.includes('.') && !trimmed.includes(' ') && !trimmed.startsWith(' ')) {
+    return `https://${trimmed}`
+  }
+
+  return `https://www.google.com/search?q=${encodeURIComponent(trimmed)}`
 }
 
 export default App
