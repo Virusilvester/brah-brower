@@ -1,3 +1,4 @@
+import { JSX } from 'react'
 import type { BookmarkItem } from '../hooks/useBookmarks'
 import '../styles/Panel.css'
 
@@ -8,7 +9,12 @@ interface BookmarksPanelProps {
   onClose: () => void
 }
 
-export function BookmarksPanel({ bookmarks, onItemClick, onRemove, onClose }: BookmarksPanelProps) {
+export function BookmarksPanel({
+  bookmarks,
+  onItemClick,
+  onRemove,
+  onClose
+}: BookmarksPanelProps): JSX.Element {
   return (
     <div className="panel bookmarks-panel">
       <div className="panel-header">

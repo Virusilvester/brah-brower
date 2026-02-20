@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, JSX } from 'react'
 import '../styles/Panel.css'
 
 interface SettingsPanelProps {
   onClose: () => void
 }
 
-export function SettingsPanel({ onClose }: SettingsPanelProps) {
+export function SettingsPanel({ onClose }: SettingsPanelProps): JSX.Element {
   const [theme, setTheme] = useState<'dark' | 'light'>('dark')
   const [searchEngine, setSearchEngine] = useState('google')
   const [homepage, setHomepage] = useState('https://www.google.com')
@@ -21,7 +21,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
     }
   }, [])
 
-  const saveSettings = () => {
+  const saveSettings = (): void => {
     const settings = { theme, searchEngine, homepage }
     localStorage.setItem('brah-settings', JSON.stringify(settings))
     onClose()

@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react'
+import { useRef, useEffect, JSX } from 'react'
 import type { Tab } from '../App'
 import '../styles/WebViewContainer.css'
 
@@ -13,7 +13,7 @@ interface WebViewContainerProps {
   onNewTab?: (url: string) => void
 }
 
-export function WebViewContainer(props: WebViewContainerProps) {
+export function WebViewContainer(props: WebViewContainerProps): JSX.Element {
   return (
     <div className="webview-container">
       {props.tabs.map((tab) => (
@@ -40,7 +40,7 @@ function WebViewInstance({
 }: {
   tab: Tab
   isActive: boolean
-} & WebViewContainerProps) {
+} & WebViewContainerProps): JSX.Element {
   const webviewRef = useRef<Electron.WebviewTag>(null)
   const isInitialized = useRef(false)
 

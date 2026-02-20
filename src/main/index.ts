@@ -104,7 +104,7 @@ function createWindow(): BrowserWindow {
   // Save window state on changes (debounced)
   let saveTimeout: NodeJS.Timeout
 
-  const saveState = () => {
+  const saveState = (): void => {
     // Get normal bounds (un-maximized size) so we can restore properly
     const bounds = mainWindow.getNormalBounds()
     const state: WindowState = {
@@ -118,7 +118,7 @@ function createWindow(): BrowserWindow {
     store.set(state)
   }
 
-  const debouncedSave = () => {
+  const debouncedSave = (): void => {
     clearTimeout(saveTimeout)
     saveTimeout = setTimeout(saveState, 100)
   }

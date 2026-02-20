@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, JSX } from 'react'
 import '../styles/TabBar.css'
 
 interface Tab {
@@ -25,12 +25,12 @@ export function TabBar({
   onTabClose,
   onAddTab,
   onReorderTabs
-}: TabBarProps) {
+}: TabBarProps): JSX.Element {
   const [draggedTabId, setDraggedTabId] = useState<string | null>(null)
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
   const dragCounter = useRef(0)
 
-  const handleDragStart = (e: React.DragEvent, tabId: string, index: number) => {
+  const handleDragStart = (e: React.DragEvent, tabId: string, index: number): void => {
     setDraggedTabId(tabId)
     e.dataTransfer.effectAllowed = 'move'
     // Set drag image (optional - browser will use default if not set)
@@ -43,7 +43,7 @@ export function TabBar({
     }, 0)
   }
 
-  const handleDragEnd = (e: React.DragEvent) => {
+  const handleDragEnd = (e: React.DragEvent): void => {
     const element = e.target as HTMLElement
     element.classList.remove('dragging')
     setDraggedTabId(null)
@@ -51,7 +51,7 @@ export function TabBar({
     dragCounter.current = 0
   }
 
-  const handleDragOver = (e: React.DragEvent, index: number) => {
+  const handleDragOver = (e: React.DragEvent, index: number): void => {
     e.preventDefault()
     e.dataTransfer.dropEffect = 'move'
 
@@ -63,7 +63,7 @@ export function TabBar({
     setDragOverIndex(index)
   }
 
-  const handleDragEnter = (e: React.DragEvent, index: number) => {
+  const handleDragEnter = (e: React.DragEvent, index: number): void => {
     e.preventDefault()
     dragCounter.current++
 
@@ -71,14 +71,14 @@ export function TabBar({
     setDragOverIndex(index)
   }
 
-  const handleDragLeave = (e: React.DragEvent, index: number) => {
+  const handleDragLeave = (e: React.DragEvent, index: number): void => {
     dragCounter.current--
     if (dragCounter.current === 0) {
       setDragOverIndex(null)
     }
   }
 
-  const handleDrop = (e: React.DragEvent, dropIndex: number) => {
+  const handleDrop = (e: React.DragEvent, dropIndex: number): void => {
     e.preventDefault()
     e.stopPropagation()
 
@@ -93,7 +93,7 @@ export function TabBar({
     dragCounter.current = 0
   }
 
-  const handleDropOnContainer = (e: React.DragEvent) => {
+  const handleDropOnContainer = (e: React.DragEvent): void => {
     e.preventDefault()
     setDragOverIndex(null)
     dragCounter.current = 0

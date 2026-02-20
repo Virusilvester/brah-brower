@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { JSX, useState } from 'react'
 import type { HistoryItem } from '../hooks/useHistory'
 import '../styles/Panel.css'
 
@@ -9,14 +9,14 @@ interface HistoryPanelProps {
   onRemove: (id: string) => void
   onClose: () => void
 }
-
+  
 export function HistoryPanel({
   history,
   onItemClick,
   onClear,
   onRemove,
   onClose
-}: HistoryPanelProps) {
+}: HistoryPanelProps): JSX.Element {
   const [searchQuery, setSearchQuery] = useState('')
 
   const filteredHistory = searchQuery

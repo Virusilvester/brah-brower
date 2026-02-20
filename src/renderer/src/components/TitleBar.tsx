@@ -1,3 +1,4 @@
+import { JSX } from 'react'
 import '../styles/TitleBar.css'
 
 interface TitleBarProps {
@@ -7,7 +8,12 @@ interface TitleBarProps {
   onClose: () => void
 }
 
-export function TitleBar({ isMaximized, onMinimize, onMaximize, onClose }: TitleBarProps) {
+export function TitleBar({
+  isMaximized,
+  onMinimize,
+  onMaximize,
+  onClose
+}: TitleBarProps): JSX.Element {
   return (
     <div className="title-bar">
       <div className="title-bar-drag-region">

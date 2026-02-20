@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, JSX } from 'react'
 import '../styles/NavigationBar.css'
 
 interface NavigationBarProps {
@@ -33,14 +33,14 @@ export function NavigationBar({
   onShowBookmarks,
   onShowDownloads,
   onShowSettings
-}: NavigationBarProps) {
+}: NavigationBarProps): JSX.Element {
   const [inputValue, setInputValue] = useState(url)
 
   useEffect(() => {
     setInputValue(url)
   }, [url])
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent): void => {
     e.preventDefault()
     onNavigate(inputValue)
   }

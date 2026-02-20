@@ -1,4 +1,5 @@
-import type { DownloadItem } from '../../preload/index.d'
+import { JSX } from 'react'
+import type { DownloadItem } from '../../../preload/index.d'
 import '../styles/Panel.css'
 
 interface DownloadsPanelProps {
@@ -15,8 +16,8 @@ export function DownloadsPanel({
   onShowInFolder,
   onClearCompleted,
   onClose
-}: DownloadsPanelProps) {
-  const formatBytes = (bytes: number) => {
+}: DownloadsPanelProps): JSX.Element {
+  const formatBytes = (bytes: number): string => {
     if (bytes === 0) return '0 B'
     const k = 1024
     const sizes = ['B', 'KB', 'MB', 'GB']
