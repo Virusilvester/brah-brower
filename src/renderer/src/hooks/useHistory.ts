@@ -10,7 +10,15 @@ export interface HistoryItem {
 
 const MAX_HISTORY_ITEMS = 500
 
-export function useHistory() {
+export interface UseHistoryResult {
+  history: HistoryItem[]
+  addToHistory: (title: string, url: string) => void
+  clearHistory: () => void
+  removeFromHistory: (id: string) => void
+  searchHistory: (query: string) => HistoryItem[]
+}
+
+export function useHistory(): UseHistoryResult {
   const [history, setHistory] = useState<HistoryItem[]>(() => {
     const saved = localStorage.getItem('brah-history')
     if (saved) {

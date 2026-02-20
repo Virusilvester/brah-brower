@@ -9,7 +9,17 @@ export interface BookmarkItem {
   folder?: string
 }
 
-export function useBookmarks() {
+export interface UseBookmarksResult {
+  bookmarks: BookmarkItem[]
+  addBookmark: (title: string, url: string, folder?: string) => void
+  removeBookmark: (id: string) => void
+  removeBookmarkByUrl: (url: string) => void
+  isBookmarked: (url: string) => boolean
+  toggleBookmark: (title: string, url: string) => void
+  updateBookmark: (id: string, updates: Partial<BookmarkItem>) => void
+}
+
+export function useBookmarks(): UseBookmarksResult {
   const [bookmarks, setBookmarks] = useState<BookmarkItem[]>(() => {
     const saved = localStorage.getItem('brah-bookmarks')
     if (saved) {

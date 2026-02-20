@@ -12,20 +12,20 @@ You can download the latest builds from the GitHub Releases section:
 
 Available for:
 
-- Windows (.exe, .zip)  
-- Linux (.AppImage, .deb, .rpm, .snap)  
+- Windows (.exe, .zip)
+- Linux (.AppImage, .deb, .rpm, .snap)
 
 ---
 
 ## Features
 
-- Multi-tab browsing  
-- Smart URL bar (detects domains vs search queries)  
-- History system  
-- Bookmark manager  
-- Download manager  
-- Custom draggable titlebar  
-- Navigation buttons: back, forward, reload  
+- Multi-tab browsing
+- Smart URL bar (detects domains vs search queries)
+- History system
+- Bookmark manager
+- Download manager
+- Custom draggable titlebar
+- Navigation buttons: back, forward, reload
 
 ---
 

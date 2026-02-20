@@ -385,3 +385,38 @@
   font-size: 12px;
   opacity: 0.7;
 }
+
+.download-controls {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.control-btn {
+  padding: 4px 10px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 11px;
+  transition: all 0.2s;
+}
+
+.control-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.control-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.control-btn.danger {
+  color: var(--danger);
+}
+
+.control-btn.danger:hover {
+  background: var(--danger);
+  color: white;
+}

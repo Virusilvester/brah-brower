@@ -7,6 +7,9 @@ interface DownloadsPanelProps {
   onOpenFile: (path: string) => void
   onShowInFolder: (path: string) => void
   onClearCompleted: () => void
+  onPause: (id: string) => void
+  onResume: (id: string) => void
+  onCancel: (id: string) => void
   onClose: () => void
 }
 
@@ -15,6 +18,9 @@ export function DownloadsPanel({
   onOpenFile,
   onShowInFolder,
   onClearCompleted,
+  onPause,
+  onResume,
+  onCancel,
   onClose
 }: DownloadsPanelProps): JSX.Element {
   const formatBytes = (bytes: number): string => {
@@ -28,8 +34,8 @@ export function DownloadsPanel({
   return (
     <div className="panel downloads-panel">
       <div className="panel-header">
-        <h3>Downloads</h3>
-        <button className="close-btn" onClick={onClose}>
+        <h3>Downloads ({downloads.length})</h3>
+        <button className="close-btn" onClick={onClose} aria-label="Close">
           ×
         </button>
       </div>
@@ -44,11 +50,14 @@ export function DownloadsPanel({
         {downloads.map((download) => (
           <div key={download.id} className="download-item">
             <div className="download-info">
-              <div className="download-filename">{download.fileName}</div>
+              <div className="download-filename" title={download.fileName}>
+                {download.fileName}
+              </div>
               <div className="download-meta">
                 {download.state === 'progressing' && (
                   <span>
                     {formatBytes(download.receivedBytes)} / {formatBytes(download.totalBytes)}
+                    {download.paused && ' (Paused)'}
                   </span>
                 )}
                 {download.state === 'completed' && <span className="completed">Completed</span>}
@@ -58,9 +67,29 @@ export function DownloadsPanel({
             </div>
 
             {download.state === 'progressing' && (
-              <div className="download-progress">
-                <div className="progress-bar" style={{ width: `${download.progress}%` }} />
-              </div>
+              <>
+                <div className="download-progress">
+                  <div className="progress-bar" style={{ width: `${download.progress}%` }} />
+                </div>
+                <div className="download-controls">
+                  {download.paused ? (
+                    <button
+                      onClick={() => onResume(download.id)}
+                      className="control-btn"
+                      disabled={!download.canResume}
+                    >
+                      Resume
+                    </button>
+                  ) : (
+                    <button onClick={() => onPause(download.id)} className="control-btn">
+                      Pause
+                    </button>
+                  )}
+                  <button onClick={() => onCancel(download.id)} className="control-btn danger">
+                    Cancel
+                  </button>
+                </div>
+              </>
             )}
 
             <div className="download-actions">
@@ -74,7 +103,13 @@ export function DownloadsPanel({
           </div>
         ))}
 
-        {downloads.length === 0 && <div className="empty-state">No downloads</div>}
+        {downloads.length === 0 && (
+          <div className="empty-state">
+            <div className="empty-icon">⬇️</div>
+            <p>No downloads</p>
+            <small>Files you download will appear here</small>
+          </div>
+        )}
       </div>
     </div>
   )

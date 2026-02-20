@@ -1,4 +1,4 @@
-import { useState, useEffect, JSX } from 'react'
+import { useState, JSX } from 'react'
 import '../styles/Panel.css'
 
 interface SettingsPanelProps {
@@ -6,20 +6,38 @@ interface SettingsPanelProps {
 }
 
 export function SettingsPanel({ onClose }: SettingsPanelProps): JSX.Element {
-  const [theme, setTheme] = useState<'dark' | 'light'>('dark')
-  const [searchEngine, setSearchEngine] = useState('google')
-  const [homepage, setHomepage] = useState('https://www.google.com')
-
-  useEffect(() => {
-    // Load settings from localStorage
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     const saved = localStorage.getItem('brah-settings')
-    if (saved) {
+    if (!saved) return 'dark'
+    try {
       const settings = JSON.parse(saved)
-      setTheme(settings.theme || 'dark')
-      setSearchEngine(settings.searchEngine || 'google')
-      setHomepage(settings.homepage || 'https://www.google.com')
+      return settings.theme === 'light' ? 'light' : 'dark'
+    } catch {
+      return 'dark'
     }
-  }, [])
+  })
+
+  const [searchEngine, setSearchEngine] = useState(() => {
+    const saved = localStorage.getItem('brah-settings')
+    if (!saved) return 'google'
+    try {
+      const settings = JSON.parse(saved)
+      return typeof settings.searchEngine === 'string' ? settings.searchEngine : 'google'
+    } catch {
+      return 'google'
+    }
+  })
+
+  const [homepage, setHomepage] = useState(() => {
+    const saved = localStorage.getItem('brah-settings')
+    if (!saved) return 'https://www.google.com'
+    try {
+      const settings = JSON.parse(saved)
+      return typeof settings.homepage === 'string' ? settings.homepage : 'https://www.google.com'
+    } catch {
+      return 'https://www.google.com'
+    }
+  })
 
   const saveSettings = (): void => {
     const settings = { theme, searchEngine, homepage }

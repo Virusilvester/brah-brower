@@ -28,7 +28,6 @@ export default defineConfig(
       ...eslintPluginReactRefresh.configs.vite.rules,
       'no-unused-vars': 'off',
       'no-console': 'off',
-      '': 'off',
       'react/react-in-jsx-scope': 'off',
       '@typescript-eslint/no-unused-vars': 'off',
       '@typescript-eslint/no-explicit-any': 'off',

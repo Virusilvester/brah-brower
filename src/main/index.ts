@@ -1,9 +1,13 @@
-import { app, BrowserWindow, ipcMain, session, shell, screen } from 'electron'
+import { app, BrowserWindow, ipcMain, shell, screen, Menu, clipboard } from 'electron'
 import path from 'path'
 import { fileURLToPath } from 'url'
 
-import StoreModule from 'electron-store'
-const Store = StoreModule.default || StoreModule
+import StoreImport from 'electron-store'
+import { createDownloadManager, type DownloadItemData } from './downloads'
+
+// electron-store v11+ is ESM; when bundled to CJS (electron-vite), `require('electron-store')`
+// can return `{ default: Store }`. Keep a runtime-safe interop here.
+const Store = (StoreImport as unknown as { default?: typeof StoreImport }).default ?? StoreImport
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -18,59 +22,42 @@ interface WindowState {
 }
 
 // Initialize store with defaults
-const store = new Store<WindowState>({
-  name: 'window-state',
+const store = new Store<WindowState & { downloads: DownloadItemData[] }>({
+  name: 'brah-browser-state',
   defaults: {
     width: 1400,
     height: 900,
     x: undefined,
     y: undefined,
     isMaximized: false,
-    isFullScreen: false
+    isFullScreen: false,
+    downloads: []
   }
 })
 
 const windows = new Set<BrowserWindow>()
-
-interface DownloadItem {
-  id: string
-  fileName: string
-  progress: number
-  state: 'progressing' | 'completed' | 'cancelled' | 'interrupted'
-  path: string
-  totalBytes: number
-  receivedBytes: number
-}
-
-const activeDownloads = new Map<string, DownloadItem>()
+const downloadManager = createDownloadManager()
 
 function createWindow(): BrowserWindow {
-  // Get saved state
   const savedState = store.store as WindowState
-  let { width, height, x, y, isMaximized } = savedState
+  const { width, height, x, y, isMaximized } = savedState
 
   // Ensure window is within screen bounds
   const primaryDisplay = screen.getPrimaryDisplay()
   const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize
 
-  // Validate position is on screen (with 50px tolerance)
   let validX = x
   let validY = y
 
   if (validX !== undefined && validY !== undefined) {
     const isOffScreen =
-      validX < -50 || // Left edge too far off
-      validY < -50 || // Top edge too far off
-      validX > screenWidth - 100 || // Too far right (at least 100px should be visible)
-      validY > screenHeight - 100 // Too far down (at least 100px should be visible)
+      validX < -50 || validY < -50 || validX > screenWidth - 100 || validY > screenHeight - 100
 
     if (isOffScreen) {
-      // Center on screen if off-screen
       validX = Math.round((screenWidth - width) / 2)
       validY = Math.round((screenHeight - height) / 2)
     }
   } else {
-    // Center if no position saved
     validX = Math.round((screenWidth - width) / 2)
     validY = Math.round((screenHeight - height) / 2)
   }
@@ -84,38 +71,33 @@ function createWindow(): BrowserWindow {
     minHeight: 600,
     frame: false,
     titleBarStyle: 'hidden',
-    show: false, // Don't show until ready to prevent visual flash
+    show: false,
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
       contextIsolation: true,
       nodeIntegration: false,
       webviewTag: true,
-      allowRunningInsecureContent: false
+      allowRunningInsecureContent: false,
+      sandbox: true
     }
   })
 
   windows.add(mainWindow)
 
-  // Restore maximized state (do this before showing)
   if (isMaximized && !mainWindow.isMaximized()) {
     mainWindow.maximize()
   }
 
-  // Save window state on changes (debounced)
+  // Save window state with debounce
   let saveTimeout: NodeJS.Timeout
-
   const saveState = (): void => {
-    // Get normal bounds (un-maximized size) so we can restore properly
     const bounds = mainWindow.getNormalBounds()
-    const state: WindowState = {
-      width: bounds.width,
-      height: bounds.height,
-      x: bounds.x,
-      y: bounds.y,
-      isMaximized: mainWindow.isMaximized(),
-      isFullScreen: mainWindow.isFullScreen()
-    }
-    store.set(state)
+    store.set('width', bounds.width)
+    store.set('height', bounds.height)
+    store.set('x', bounds.x)
+    store.set('y', bounds.y)
+    store.set('isMaximized', mainWindow.isMaximized())
+    store.set('isFullScreen', mainWindow.isFullScreen())
   }
 
   const debouncedSave = (): void => {
@@ -123,7 +105,6 @@ function createWindow(): BrowserWindow {
     saveTimeout = setTimeout(saveState, 100)
   }
 
-  // Save on various window events
   mainWindow.on('resize', debouncedSave)
   mainWindow.on('move', debouncedSave)
   mainWindow.on('maximize', saveState)
@@ -142,7 +123,7 @@ function createWindow(): BrowserWindow {
   })
 
   setupWindowControls(mainWindow)
-  setupDownloadHandling(mainWindow)
+  setupStorageAPI()
   setupExternalLinks(mainWindow)
 
   if (process.env.VITE_DEV_SERVER_URL) {
@@ -155,81 +136,293 @@ function createWindow(): BrowserWindow {
   return mainWindow
 }
 
+function setupContextMenuForWebContents(
+  contents: Electron.WebContents,
+  window: BrowserWindow
+): void {
+  contents.on('context-menu', (_event, params) => {
+    const template: Electron.MenuItemConstructorOptions[] = []
+
+    // Link context menu
+    if (params.linkURL && params.linkURL !== '') {
+      template.push(
+        {
+          label: 'Open Link in New Tab',
+          click: () => {
+            window.webContents.send('webview-new-tab', params.linkURL)
+          }
+        },
+        {
+          label: 'Open Link in New Window',
+          click: () => {
+            createPopupWindow(params.linkURL, window)
+          }
+        },
+        { type: 'separator' },
+        {
+          label: 'Copy Link Address',
+          click: () => {
+            clipboard.writeText(params.linkURL)
+          }
+        },
+        {
+          label: 'Copy Link Text',
+          click: () => {
+            clipboard.writeText(params.linkText || '')
+          }
+        }
+      )
+    }
+
+    // Image context menu
+    if (params.hasImageContents && params.srcURL) {
+      if (template.length > 0) template.push({ type: 'separator' })
+
+      template.push(
+        {
+          label: 'Open Image in New Tab',
+          click: () => {
+            window.webContents.send('webview-new-tab', params.srcURL)
+          }
+        },
+        {
+          label: 'Save Image As...',
+          click: () => {
+            // Trigger download via webview
+            contents.downloadURL(params.srcURL)
+          }
+        },
+        {
+          label: 'Copy Image',
+          click: () => {
+            contents.copyImageAt(params.x, params.y)
+          }
+        },
+        {
+          label: 'Copy Image Address',
+          click: () => {
+            clipboard.writeText(params.srcURL)
+          }
+        }
+      )
+    }
+
+    // Selected text context menu
+    if (params.selectionText && params.selectionText.trim().length > 0) {
+      if (template.length > 0) template.push({ type: 'separator' })
+
+      template.push(
+        {
+          label: `Search Google for "${params.selectionText.substring(0, 25)}${params.selectionText.length > 25 ? '...' : ''}"`,
+          click: () => {
+            const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(params.selectionText)}`
+            window.webContents.send('webview-new-tab', searchUrl)
+          }
+        },
+        { type: 'separator' },
+        {
+          label: 'Copy',
+          click: () => {
+            clipboard.writeText(params.selectionText)
+          }
+        }
+      )
+
+      // Only show cut if editable
+      if (params.isEditable) {
+        template.unshift({
+          label: 'Cut',
+          click: () => {
+            contents.cut()
+          }
+        })
+      }
+    }
+
+    // Editable area context menu (inputs, textareas, contenteditable)
+    if (params.isEditable) {
+      if (template.length > 0 && !params.selectionText) template.push({ type: 'separator' })
+
+      // Add paste if not already added via selection
+      if (!params.selectionText) {
+        template.push(
+          {
+            label: 'Cut',
+            enabled: params.editFlags.canCut,
+            click: () => contents.cut()
+          },
+          {
+            label: 'Copy',
+            enabled: params.editFlags.canCopy,
+            click: () => contents.copy()
+          }
+        )
+      }
+
+      template.push({
+        label: 'Paste',
+        enabled: params.editFlags.canPaste,
+        click: () => contents.paste()
+      })
+
+      if (params.editFlags.canSelectAll) {
+        template.push({
+          label: 'Select All',
+          click: () => contents.selectAll()
+        })
+      }
+    }
+
+    // Page navigation options (when right-clicking on page, not link)
+    if (
+      !params.linkURL &&
+      !params.hasImageContents &&
+      !params.isEditable &&
+      !params.selectionText
+    ) {
+      template.push(
+        {
+          label: 'Back',
+          enabled: contents.canGoBack(),
+          click: () => contents.goBack()
+        },
+        {
+          label: 'Forward',
+          enabled: contents.canGoForward(),
+          click: () => contents.goForward()
+        },
+        {
+          label: 'Reload',
+          click: () => contents.reload()
+        },
+        { type: 'separator' },
+        {
+          label: 'Save Page As...',
+          click: () => {
+            // This would need a save dialog implementation
+            window.webContents.send('save-page-requested')
+          }
+        },
+        {
+          label: 'Print...',
+          click: () => contents.print()
+        }
+      )
+    }
+
+    // Add separator and inspect element for all contexts
+    if (template.length > 0) template.push({ type: 'separator' })
+
+    // Only show inspect in development or if explicitly enabled
+    const isDev = !!process.env.VITE_DEV_SERVER_URL
+    if (isDev) {
+      template.push({
+        label: 'Inspect Element',
+        click: () => {
+          contents.inspectElement(params.x, params.y)
+          if (!contents.isDevToolsOpened()) {
+            contents.openDevTools()
+          }
+        }
+      })
+    }
+
+    // Build and show menu
+    if (template.length > 0) {
+      const menu = Menu.buildFromTemplate(template)
+      menu.popup({
+        window: window,
+        x: params.x,
+        y: params.y,
+        frame: params.frame ?? undefined
+      })
+    }
+  })
+}
+
+// Helper function to create popup windows
+function createPopupWindow(url: string, parentWindow: BrowserWindow): BrowserWindow {
+  const popup = new BrowserWindow({
+    width: 1024,
+    height: 768,
+    parent: parentWindow,
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true
+    }
+  })
+  popup.loadURL(url)
+  return popup
+}
+
 function setupWindowControls(window: BrowserWindow): void {
-  ipcMain.handle('window:minimize', () => window.minimize())
-  ipcMain.handle('window:maximize', () => {
+  // Security: Validate sender in all handlers
+  const validateSender = (event: Electron.IpcMainInvokeEvent): boolean => {
+    return event.sender === window.webContents
+  }
+
+  ipcMain.handle('window:minimize', (event) => {
+    if (!validateSender(event)) return
+    window.minimize()
+  })
+
+  ipcMain.handle('window:maximize', (event) => {
+    if (!validateSender(event)) return
     if (window.isMaximized()) window.unmaximize()
     else window.maximize()
   })
-  ipcMain.handle('window:close', () => window.close())
-  ipcMain.handle('window:isMaximized', () => window.isMaximized())
+
+  ipcMain.handle('window:close', (event) => {
+    if (!validateSender(event)) return
+    window.close()
+  })
+
+  ipcMain.handle('window:isMaximized', (event) => {
+    if (!validateSender(event)) return false
+    return window.isMaximized()
+  })
 
   window.on('maximize', () => window.webContents.send('window:maximized', true))
   window.on('unmaximize', () => window.webContents.send('window:maximized', false))
 }
 
-function setupDownloadHandling(window: BrowserWindow): void {
-  session.defaultSession.on('will-download', (_event, item) => {
-    const id = crypto.randomUUID()
-    const fileName = item.getFilename()
-    const savePath = path.join(app.getPath('downloads'), fileName)
+function setupStorageAPI(): void {
+  // Implement storage API that was exposed in preload but not handled
+  ipcMain.handle('storage:get', (event, key: string) => {
+    // Validate sender
+    const window = BrowserWindow.fromWebContents(event.sender)
+    if (!window) return null
 
-    item.setSavePath(savePath)
-
-    const downloadItem: DownloadItem = {
-      id,
-      fileName,
-      progress: 0,
-      state: 'progressing',
-      path: savePath,
-      totalBytes: item.getTotalBytes(),
-      receivedBytes: 0
+    try {
+      return store.get(key as any)
+    } catch {
+      return null
     }
-
-    activeDownloads.set(id, downloadItem)
-    window.webContents.send('download:started', downloadItem)
-
-    item.on('updated', (_event, state) => {
-      const received = item.getReceivedBytes()
-      const total = item.getTotalBytes()
-      const progress = total > 0 ? Math.round((received / total) * 100) : 0
-      const updated = {
-        ...downloadItem,
-        receivedBytes: received,
-        totalBytes: total,
-        progress,
-        state: state === 'progressing' ? 'progressing' : 'interrupted'
-      }
-      activeDownloads.set(id, updated)
-      window.webContents.send('download:progress', updated)
-    })
-
-    item.once('done', (_event, state) => {
-      const final = {
-        ...downloadItem,
-        state: state as any,
-        progress: state === 'completed' ? 100 : downloadItem.progress
-      }
-      activeDownloads.set(id, final)
-      window.webContents.send('download:completed', final)
-      if (state === 'completed') shell.showItemInFolder(savePath)
-    })
   })
 
-  ipcMain.handle('download:open', (_event, filePath: string) => shell.openPath(filePath))
-  ipcMain.handle('download:show-in-folder', (_event, filePath: string) =>
-    shell.showItemInFolder(filePath)
-  )
+  ipcMain.handle('storage:set', (event, key: string, value: any) => {
+    const window = BrowserWindow.fromWebContents(event.sender)
+    if (!window) return
+
+    try {
+      store.set(key as any, value)
+    } catch (err) {
+      console.error('Storage set error:', err)
+    }
+  })
 }
 
 function setupExternalLinks(window: BrowserWindow): void {
-  window.webContents.setWindowOpenHandler(({ url, disposition, frameName, features }) => {
+  // Add context menu for main window webContents
+  setupContextMenuForWebContents(window.webContents, window)
+  window.webContents.setWindowOpenHandler(({ url, disposition }) => {
     if (disposition === 'new-window' || disposition === 'foreground-tab') {
       return {
         action: 'allow',
         overrideBrowserWindowOptions: {
-          width: 500,
-          height: 600,
+          width: 1024,
+          height: 768,
           frame: true,
           parent: window,
           webPreferences: {
@@ -253,6 +446,7 @@ function setupExternalLinks(window: BrowserWindow): void {
 }
 
 app.whenReady().then(() => {
+  downloadManager.setupDownloadIPCHandlers()
   createWindow()
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
@@ -264,28 +458,23 @@ app.on('window-all-closed', () => {
 })
 
 app.on('web-contents-created', (_event, contents) => {
-  if (contents.getType() === 'webview') {
-    contents.setWindowOpenHandler(({ url, disposition, frameName }) => {
-      if (disposition === 'new-window' || frameName === '_blank') {
-        return {
-          action: 'allow',
-          overrideBrowserWindowOptions: {
-            width: 500,
-            height: 600,
-            frame: true,
-            webPreferences: {
-              contextIsolation: true,
-              nodeIntegration: false,
-              sandbox: true
-            }
-          }
-        }
-      }
+  downloadManager.ensureDownloadHandlingForSession(contents.session)
 
-      const mainWindow = BrowserWindow.fromWebContents(contents.hostWebContents)
-      if (mainWindow) {
-        mainWindow.webContents.send('webview-new-tab', url)
-      }
+  if (contents.getType() === 'webview') {
+    // Get the host window for this webview
+    const hostWebContents = contents.hostWebContents
+    const window = hostWebContents ? BrowserWindow.fromWebContents(hostWebContents) : null
+
+    if (window) {
+      setupContextMenuForWebContents(contents, window)
+    }
+
+    contents.setWindowOpenHandler(({ url, disposition, frameName }) => {
+      // Prevent popups/new windows from the webview; renderer handles tab creation via the
+      // <webview> 'new-window' event and our explicit context-menu actions.
+      void url
+      void disposition
+      void frameName
       return { action: 'deny' }
     })
   }

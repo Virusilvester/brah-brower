@@ -9,7 +9,7 @@ interface HistoryPanelProps {
   onRemove: (id: string) => void
   onClose: () => void
 }
-  
+
 export function HistoryPanel({
   history,
   onItemClick,
@@ -27,7 +27,7 @@ export function HistoryPanel({
       )
     : history
 
-  const groupByDate = (items: HistoryItem[]) => {
+  const groupByDate = (items: HistoryItem[]): Record<string, HistoryItem[]> => {
     const groups: { [key: string]: HistoryItem[] } = {}
 
     items.forEach((item) => {

@@ -1,21 +1,39 @@
 import { useState, useEffect, useCallback } from 'react'
-import type { DownloadItem } from '../../preload/index.d'
+import type { DownloadItem } from '../../../preload/index.d'
 
-export function useDownloads() {
+export interface UseDownloadsResult {
+  downloads: DownloadItem[]
+  clearCompletedDownloads: () => void
+  removeDownload: (id: string) => void
+  pauseDownload: (id: string) => void
+  resumeDownload: (id: string) => void
+  cancelDownload: (id: string) => void
+}
+
+export function useDownloads(): UseDownloadsResult {
   const [downloads, setDownloads] = useState<DownloadItem[]>([])
 
   useEffect(() => {
-    window.downloads.onStarted((data) => {
+    const downloadsApi = window.downloads
+    if (!downloadsApi) return
+
+    const cleanupStarted = downloadsApi.onStarted((data) => {
       setDownloads((prev) => [data, ...prev])
     })
 
-    window.downloads.onProgress((data) => {
+    const cleanupProgress = downloadsApi.onProgress((data) => {
       setDownloads((prev) => prev.map((d) => (d.id === data.id ? data : d)))
     })
 
-    window.downloads.onCompleted((data) => {
+    const cleanupCompleted = downloadsApi.onCompleted((data) => {
       setDownloads((prev) => prev.map((d) => (d.id === data.id ? data : d)))
     })
+
+    return () => {
+      cleanupStarted()
+      cleanupProgress()
+      cleanupCompleted()
+    }
   }, [])
 
   const clearCompletedDownloads = useCallback(() => {
@@ -26,9 +44,28 @@ export function useDownloads() {
     setDownloads((prev) => prev.filter((d) => d.id !== id))
   }, [])
 
+  const pauseDownload = useCallback((id: string) => {
+    window.downloads?.pause(id)
+  }, [])
+
+  const resumeDownload = useCallback((id: string) => {
+    window.downloads?.resume(id)
+  }, [])
+
+  const cancelDownload = useCallback(
+    (id: string) => {
+      window.downloads?.cancel(id)
+      removeDownload(id)
+    },
+    [removeDownload]
+  )
+
   return {
     downloads,
     clearCompletedDownloads,
-    removeDownload
+    removeDownload,
+    pauseDownload,
+    resumeDownload,
+    cancelDownload
   }
 }

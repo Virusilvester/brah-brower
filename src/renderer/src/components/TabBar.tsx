@@ -30,7 +30,7 @@ export function TabBar({
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
   const dragCounter = useRef(0)
 
-  const handleDragStart = (e: React.DragEvent, tabId: string, index: number): void => {
+  const handleDragStart = (e: React.DragEvent, tabId: string): void => {
     setDraggedTabId(tabId)
     e.dataTransfer.effectAllowed = 'move'
     // Set drag image (optional - browser will use default if not set)
@@ -71,7 +71,7 @@ export function TabBar({
     setDragOverIndex(index)
   }
 
-  const handleDragLeave = (e: React.DragEvent, index: number): void => {
+  const handleDragLeave = (): void => {
     dragCounter.current--
     if (dragCounter.current === 0) {
       setDragOverIndex(null)
@@ -106,11 +106,11 @@ export function TabBar({
           <div
             key={tab.id}
             draggable={true}
-            onDragStart={(e) => handleDragStart(e, tab.id, index)}
+            onDragStart={(e) => handleDragStart(e, tab.id)}
             onDragEnd={handleDragEnd}
             onDragOver={(e) => handleDragOver(e, index)}
             onDragEnter={(e) => handleDragEnter(e, index)}
-            onDragLeave={(e) => handleDragLeave(e, index)}
+            onDragLeave={handleDragLeave}
             onDrop={(e) => handleDrop(e, index)}
             onClick={() => onTabSelect(tab.id)}
             className={`

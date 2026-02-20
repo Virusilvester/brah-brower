@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef, JSX } from 'react'
 import { TabBar } from './components/TabBar'
 import { NavigationBar } from './components/NavigationBar'
 import { TitleBar } from './components/TitleBar'
@@ -6,7 +6,7 @@ import { HistoryPanel } from './components/HistoryPanel'
 import { BookmarksPanel } from './components/BookmarksPanel'
 import { DownloadsPanel } from './components/DownloadsPanel'
 import { SettingsPanel } from './components/SettingsPanel'
-import { WebViewContainer } from './components/WebViewContainer'
+import { WebViewContainer, WebViewRef } from './components/WebViewContainer'
 import { useBrowserState } from './hooks/useBrowserState'
 import { useHistory } from './hooks/useHistory'
 import { useBookmarks } from './hooks/useBookmarks'
@@ -28,6 +28,7 @@ export type PanelType = 'history' | 'bookmarks' | 'downloads' | 'settings' | nul
 function App(): JSX.Element {
   const [activePanel, setActivePanel] = useState<PanelType>(null)
   const [isMaximized, setIsMaximized] = useState(false)
+  const webviewRef = useRef<WebViewRef>(null)
 
   const {
     tabs,
@@ -43,28 +44,29 @@ function App(): JSX.Element {
 
   const { history, addToHistory, clearHistory, removeFromHistory } = useHistory()
 
-  const {
-    bookmarks,
-    removeBookmark, // For removing from panel
-    isBookmarked,
-    toggleBookmark // Use toggle instead of add
-  } = useBookmarks()
+  const { bookmarks, removeBookmark, isBookmarked, toggleBookmark } = useBookmarks()
 
-  const { downloads, clearCompletedDownloads } = useDownloads()
+  const { downloads, clearCompletedDownloads, pauseDownload, resumeDownload, cancelDownload } =
+    useDownloads()
 
   const activeTab = tabs.find((t) => t.id === activeTabId) || tabs[0]
 
   useEffect(() => {
-    window.windowControls?.onMaximizedChange?.(setIsMaximized)
+    const cleanup = window.windowControls?.onMaximizedChange?.(setIsMaximized)
+    return () => {
+      if (cleanup) cleanup()
+    }
   }, [])
 
   const handleNavigate = useCallback(
     (url: string) => {
       if (!activeTabId) return
-      updateTab(activeTabId, { url })
+      if (webviewRef.current) {
+        webviewRef.current.loadURL(url)
+      }
       addToHistory(activeTab?.title || 'New Tab', url)
     },
-    [activeTabId, updateTab, addToHistory, activeTab?.title]
+    [activeTabId, addToHistory, activeTab?.title]
   )
 
   const handleLoadURL = useCallback(
@@ -76,18 +78,21 @@ function App(): JSX.Element {
   )
 
   const handleGoBack = useCallback(() => {
-    // Handled by webview
+    webviewRef.current?.goBack()
   }, [])
 
   const handleGoForward = useCallback(() => {
-    // Handled by webview
+    webviewRef.current?.goForward()
   }, [])
 
   const handleReload = useCallback(() => {
-    // Handled by webview
-  }, [])
+    if (activeTab?.isLoading) {
+      webviewRef.current?.stop()
+    } else {
+      webviewRef.current?.reload()
+    }
+  }, [activeTab?.isLoading])
 
-  // CHANGED: Use toggle instead of just add
   const handleToggleBookmark = useCallback(() => {
     if (activeTab) {
       toggleBookmark(activeTab.title, activeTab.url)
@@ -97,6 +102,13 @@ function App(): JSX.Element {
   const togglePanel = useCallback((panel: PanelType) => {
     setActivePanel((current) => (current === panel ? null : panel))
   }, [])
+
+  const handleNewTab = useCallback(
+    (url: string) => {
+      addTab(url)
+    },
+    [addTab]
+  )
 
   return (
     <div className="app">
@@ -126,7 +138,7 @@ function App(): JSX.Element {
         onForward={handleGoForward}
         onReload={handleReload}
         onNavigate={handleLoadURL}
-        onToggleBookmark={handleToggleBookmark} // Changed prop name
+        onToggleBookmark={handleToggleBookmark}
         onShowHistory={() => togglePanel('history')}
         onShowBookmarks={() => togglePanel('bookmarks')}
         onShowDownloads={() => togglePanel('downloads')}
@@ -135,6 +147,7 @@ function App(): JSX.Element {
 
       <div className="content-area">
         <WebViewContainer
+          ref={webviewRef}
           tabs={tabs}
           activeTabId={activeTabId}
           onTitleChange={(tabId, title) => updateTab(tabId, { title })}
@@ -146,6 +159,7 @@ function App(): JSX.Element {
           }}
           onLoadingChange={updateTabLoading}
           onNavigationStateChange={updateTabNavigationState}
+          onNewTab={handleNewTab}
         />
 
         {activePanel && (
@@ -170,7 +184,7 @@ function App(): JSX.Element {
                   handleNavigate(url)
                   setActivePanel(null)
                 }}
-                onRemove={removeBookmark} // Pass remove function
+                onRemove={removeBookmark}
                 onClose={() => setActivePanel(null)}
               />
             )}
@@ -181,6 +195,9 @@ function App(): JSX.Element {
                 onOpenFile={(path) => window.downloads?.openFile(path)}
                 onShowInFolder={(path) => window.downloads?.showInFolder(path)}
                 onClearCompleted={clearCompletedDownloads}
+                onPause={pauseDownload}
+                onResume={resumeDownload}
+                onCancel={cancelDownload}
                 onClose={() => setActivePanel(null)}
               />
             )}

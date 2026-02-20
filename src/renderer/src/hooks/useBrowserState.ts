@@ -3,7 +3,19 @@ import type { Tab } from '../App'
 
 const HOME_URL = 'https://www.google.com'
 
-export function useBrowserState() {
+export interface UseBrowserStateResult {
+  tabs: Tab[]
+  activeTabId: string
+  addTab: (url?: string) => void
+  closeTab: (id: string) => void
+  setActiveTab: (id: string) => void
+  reorderTabs: (dragIndex: number, hoverIndex: number) => void
+  updateTab: (id: string, updates: Partial<Tab>) => void
+  updateTabLoading: (id: string, isLoading: boolean) => void
+  updateTabNavigationState: (id: string, canGoBack: boolean, canGoForward: boolean) => void
+}
+
+export function useBrowserState(): UseBrowserStateResult {
   const [tabs, setTabs] = useState<Tab[]>(() => {
     const saved = localStorage.getItem('brah-tabs')
     if (saved) {
