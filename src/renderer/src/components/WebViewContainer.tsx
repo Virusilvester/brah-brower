@@ -15,6 +15,10 @@ export interface WebViewRef {
   loadURL: (url: string) => void
 }
 
+type InternalAction =
+  | { type: 'bookmark'; tabId: string; url: string; title?: string; favicon?: string }
+  | { type: 'remove-most-visited'; tabId: string; url: string }
+
 interface WebViewContainerProps {
   tabs: Tab[]
   activeTabId: string
@@ -79,12 +83,26 @@ export const WebViewContainer = forwardRef<WebViewRef, WebViewContainerProps>(
         loadURL: (url: string) => {
           const webview = webviewRefs.current.get(props.activeTabId)
           if (webview) {
-            webview.loadURL(url)
+            webview.loadURL(resolveInternalUrl(url))
           }
         }
       }),
       [props.activeTabId]
     )
+
+    useEffect(() => {
+      const handler = (e: Event): void => {
+        const detail = (e as CustomEvent).detail as { tabId?: string } | undefined
+        const tabId = detail?.tabId
+        if (!tabId) return
+        const webview = webviewRefs.current.get(tabId)
+        if (!webview) return
+        webview.loadURL(resolveInternalUrl('brah://home'))
+      }
+
+      window.addEventListener('brah:home-refresh', handler as EventListener)
+      return () => window.removeEventListener('brah:home-refresh', handler as EventListener)
+    }, [])
 
     return (
       <div className="webview-container">
@@ -227,6 +245,41 @@ function WebViewInstance({
         }
       },
       'will-navigate': (e) => {
+        if (typeof e?.url === 'string' && e.url.startsWith('brah://')) {
+          try {
+            const u = new URL(e.url)
+            if (u.hostname === 'bookmark') {
+              e.preventDefault()
+              const url = u.searchParams.get('url') ?? ''
+              const title = u.searchParams.get('title') ?? undefined
+              const favicon = u.searchParams.get('favicon') ?? undefined
+              const detail: InternalAction = {
+                type: 'bookmark',
+                tabId: tab.id,
+                url,
+                title,
+                favicon
+              }
+              window.dispatchEvent(new CustomEvent('brah:internal-action', { detail }))
+              return
+            }
+            if (u.hostname === 'remove-most-visited') {
+              e.preventDefault()
+              const url = u.searchParams.get('url') ?? ''
+              const detail: InternalAction = { type: 'remove-most-visited', tabId: tab.id, url }
+              window.dispatchEvent(new CustomEvent('brah:internal-action', { detail }))
+              return
+            }
+            if (u.hostname === 'home') {
+              // Let the app handle brah://home (it resolves to internal data URL).
+              e.preventDefault()
+              webview.loadURL(resolveInternalUrl('brah://home'))
+              return
+            }
+          } catch {
+            // ignore
+          }
+        }
         if (!isInternalDataUrl(e.url)) {
           onUrlChange(tab.id, e.url)
         }

@@ -80,6 +80,7 @@ export interface SettingsAPI {
 
 export interface BrowserEventsAPI {
   onWebviewNewTab: (callback: (url: string) => void) => () => void
+  onNewTab: (callback: () => void) => () => void
 }
 
 // Window controls API
@@ -153,6 +154,11 @@ contextBridge.exposeInMainWorld('browserEvents', {
     const handler = (_event: IpcRendererEvent, url: string): void => callback(url)
     ipcRenderer.on('webview-new-tab', handler)
     return () => ipcRenderer.removeListener('webview-new-tab', handler)
+  },
+  onNewTab: (callback: () => void) => {
+    const handler = (): void => callback()
+    ipcRenderer.on('browser:new-tab', handler)
+    return () => ipcRenderer.removeListener('browser:new-tab', handler)
   }
 } as BrowserEventsAPI)
 

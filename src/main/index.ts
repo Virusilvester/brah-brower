@@ -65,6 +65,7 @@ const downloadManager = createDownloadManager({
 })
 const knownSessionPartitions = new Set<string>()
 let privacyHandlersRegistered = false
+const newTabNotifiers = new WeakSet<Electron.WebContents>()
 
 function registerSession(sess: Electron.Session): void {
   try {
@@ -164,6 +165,7 @@ function createWindow(): BrowserWindow {
   setupSettingsAPI()
   setupPrivacyAPI()
   setupExternalLinks(mainWindow)
+  setupNewTabShortcuts(mainWindow.webContents, mainWindow)
 
   // Set up download handling for the default session of this window
   downloadManager.ensureDownloadHandlingForSession(mainWindow.webContents.session)
@@ -177,6 +179,19 @@ function createWindow(): BrowserWindow {
   }
 
   return mainWindow
+}
+
+function setupNewTabShortcuts(contents: Electron.WebContents, window: BrowserWindow): void {
+  if (newTabNotifiers.has(contents)) return
+  newTabNotifiers.add(contents)
+
+  contents.on('before-input-event', (event, input) => {
+    const key = (input.key || '').toLowerCase()
+    if ((input.control || input.meta) && key === 't') {
+      event.preventDefault()
+      window.webContents.send('browser:new-tab')
+    }
+  })
 }
 
 function setupContextMenuForWebContents(
@@ -625,6 +640,7 @@ app.on('web-contents-created', (_event, contents) => {
 
     if (window) {
       setupContextMenuForWebContents(contents, window)
+      setupNewTabShortcuts(contents, window)
     }
 
     // IMPORTANT: Handle navigation to direct file URLs (ZIP, PDF, etc.)

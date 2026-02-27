@@ -60,6 +60,7 @@ export interface SettingsAPI {
 
 export interface BrowserEventsAPI {
   onWebviewNewTab: (callback: (url: string) => void) => () => void
+  onNewTab: (callback: () => void) => () => void
 }
 
 export interface ClearDataOptions {

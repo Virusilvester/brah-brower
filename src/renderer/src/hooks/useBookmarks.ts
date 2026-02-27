@@ -11,7 +11,7 @@ export interface BookmarkItem {
 
 export interface UseBookmarksResult {
   bookmarks: BookmarkItem[]
-  addBookmark: (title: string, url: string, folder?: string) => void
+  addBookmark: (title: string, url: string, folder?: string, favicon?: string) => void
   removeBookmark: (id: string) => void
   removeBookmarkByUrl: (url: string) => void
   isBookmarked: (url: string) => boolean
@@ -46,7 +46,7 @@ export function useBookmarks(): UseBookmarksResult {
   }, [])
 
   const addBookmark = useCallback(
-    (title: string, url: string, folder?: string) => {
+    (title: string, url: string, folder?: string, favicon?: string) => {
       if (!url) return
 
       // Don't add if already exists
@@ -56,6 +56,7 @@ export function useBookmarks(): UseBookmarksResult {
         id: crypto.randomUUID(),
         title: title || url,
         url,
+        favicon,
         createdAt: Date.now(),
         folder
       }

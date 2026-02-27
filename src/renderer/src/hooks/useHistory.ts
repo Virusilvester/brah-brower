@@ -15,6 +15,7 @@ export interface UseHistoryResult {
   addToHistory: (title: string, url: string) => void
   clearHistory: () => void
   removeFromHistory: (id: string) => void
+  removeFromHistoryByUrl: (url: string) => void
   searchHistory: (query: string) => HistoryItem[]
 }
 
@@ -47,7 +48,13 @@ export function useHistory(): UseHistoryResult {
 
   const addToHistory = useCallback((title: string, url: string) => {
     // Don't add empty URLs or chrome:// URLs
-    if (!url || url.startsWith('chrome://') || url.startsWith('file://')) return
+    if (
+      !url ||
+      url.startsWith('chrome://') ||
+      url.startsWith('file://') ||
+      url.startsWith('brah://')
+    )
+      return
 
     setHistory((prev) => {
       // Remove duplicate if exists
@@ -74,6 +81,11 @@ export function useHistory(): UseHistoryResult {
     setHistory((prev) => prev.filter((item) => item.id !== id))
   }, [])
 
+  const removeFromHistoryByUrl = useCallback((url: string) => {
+    if (!url) return
+    setHistory((prev) => prev.filter((item) => item.url !== url))
+  }, [])
+
   const searchHistory = useCallback(
     (query: string) => {
       const lowerQuery = query.toLowerCase()
@@ -91,6 +103,7 @@ export function useHistory(): UseHistoryResult {
     addToHistory,
     clearHistory,
     removeFromHistory,
+    removeFromHistoryByUrl,
     searchHistory
   }
 }
