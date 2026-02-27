@@ -42,8 +42,14 @@ function App(): JSX.Element {
     updateTabNavigationState
   } = useBrowserState()
 
-  const { history, addToHistory, clearHistory, removeFromHistory, removeFromHistoryByUrl } =
-    useHistory()
+  const {
+    history,
+    addToHistory,
+    clearHistory,
+    removeFromHistory,
+    removeFromHistoryByUrl,
+    removeFromHistoryByHost
+  } = useHistory()
 
   const { bookmarks, addBookmark, removeBookmark, isBookmarked, toggleBookmark } = useBookmarks()
 
@@ -86,7 +92,7 @@ function App(): JSX.Element {
     const handler = (e: Event): void => {
       const detail = (e as CustomEvent).detail as
         | { type: 'bookmark'; tabId: string; url: string; title?: string; favicon?: string }
-        | { type: 'remove-most-visited'; tabId: string; url: string }
+        | { type: 'remove-most-visited'; tabId: string; url?: string; host?: string }
         | undefined
       if (!detail) return
 
@@ -101,9 +107,8 @@ function App(): JSX.Element {
       }
 
       if (detail.type === 'remove-most-visited') {
-        if (detail.url) {
-          removeFromHistoryByUrl(detail.url)
-        }
+        if (detail.host) removeFromHistoryByHost(detail.host)
+        else if (detail.url) removeFromHistoryByUrl(detail.url)
         window.dispatchEvent(
           new CustomEvent('brah:home-refresh', { detail: { tabId: detail.tabId } })
         )
@@ -112,7 +117,7 @@ function App(): JSX.Element {
 
     window.addEventListener('brah:internal-action', handler as EventListener)
     return () => window.removeEventListener('brah:internal-action', handler as EventListener)
-  }, [addBookmark, removeFromHistoryByUrl])
+  }, [addBookmark, removeFromHistoryByHost, removeFromHistoryByUrl])
 
   const handleNavigate = useCallback(
     (url: string) => {

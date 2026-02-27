@@ -15,34 +15,44 @@ export function getOfflineHomeUrl(topSites: HistoryItem[] = []): string {
       .replaceAll('"', '&quot;')
       .replaceAll("'", '&#39;')
 
-  // Get unique domains from history, sorted by most recent
-  const uniqueSites = topSites
-    .filter((item, index, self) => index === self.findIndex((t) => t.url === item.url))
-    .slice(0, 8)
+  // Get unique sites by hostname, sorted by most recent.
+  // (So the same site doesn't show up over and over with different pages.)
+  const uniqueSites = (() => {
+    const sorted = [...topSites].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
+    const byHost = new Map<string, HistoryItem>()
+    for (const item of sorted) {
+      try {
+        const host = new URL(item.url).hostname.replace(/^www\./, '')
+        if (!host) continue
+        if (!byHost.has(host)) byHost.set(host, item)
+      } catch {
+        // ignore invalid URLs
+      }
+    }
+    return Array.from(byHost.values()).slice(0, 8)
+  })()
 
   const sitesHtml =
     uniqueSites.length > 0
       ? uniqueSites
           .map((site) => {
-            const domain = new URL(site.url).hostname.replace('www.', '')
+            const domain = new URL(site.url).hostname.replace(/^www\./, '')
             const favicon =
               site.favicon || `https://www.google.com/s2/favicons?domain=${domain}&sz=64`
+            const removeAction = `brah://remove-most-visited?host=${encodeURIComponent(domain)}`
             return `
           <div class="site-card" role="link" tabindex="0" data-url="${escapeAttr(
             site.url
           )}" title="${escapeAttr(site.title || site.url)}">
             <div class="site-actions">
-              <button class="site-action bookmark" type="button" data-action="brah://bookmark?url=${encodeURIComponent(
-                site.url
-              )}&title=${encodeURIComponent(site.title || site.url)}&favicon=${encodeURIComponent(
-                site.favicon || ''
-              )}" title="Add to bookmarks" aria-label="Add to bookmarks">+</button>
-              <button class="site-action remove" type="button" data-action="brah://remove-most-visited?url=${encodeURIComponent(
-                site.url
-              )}" title="Remove" aria-label="Remove from most visited">×</button>
+              <button class="site-action remove" type="button" data-action="${escapeAttr(
+                removeAction
+              )}" title="Remove" aria-label="Remove from most visited">&times;</button>
             </div>
             <div class="site-icon">
-              <img src="${favicon}" alt="" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌐</text></svg>'">
+              <img src="${escapeAttr(
+                favicon
+              )}" alt="" referrerpolicy="no-referrer" loading="lazy" onerror="this.onerror=null;this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2220%22 fill=%22%231a1a1f%22/><text x=%2250%22 y=%2264%22 text-anchor=%22middle%22 font-size=%2254%22 fill=%22%23ffffff%22>W</text></svg>'">
             </div>
             <div class="site-name">${escapeAttr(domain)}</div>
           </div>
@@ -51,7 +61,7 @@ export function getOfflineHomeUrl(topSites: HistoryItem[] = []): string {
           .join('')
       : `
       <div class="empty-sites">
-        <div class="empty-icon">📊</div>
+        <div class="empty-icon">&#128202;</div>
         <p>Your most visited sites will appear here</p>
       </div>
     `
@@ -160,6 +170,42 @@ export function getOfflineHomeUrl(topSites: HistoryItem[] = []): string {
       .search-input::placeholder {
         color: var(--text-secondary);
       }
+
+      .suggestions {
+        position: absolute;
+        top: calc(100% + 10px);
+        left: 0;
+        right: 0;
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        box-shadow: var(--shadow);
+        overflow: hidden;
+        z-index: 10;
+        padding: 6px;
+        display: none;
+      }
+
+      .suggestions.show {
+        display: block;
+      }
+
+      .suggestion-item {
+        width: 100%;
+        border: none;
+        background: transparent;
+        color: var(--text-primary);
+        text-align: left;
+        padding: 10px 12px;
+        border-radius: 10px;
+        cursor: pointer;
+        font-size: 13px;
+      }
+
+      .suggestion-item:hover,
+      .suggestion-item.active {
+        background: rgba(255,255,255,0.08);
+      }
       
       .search-btn {
         background: var(--accent);
@@ -204,7 +250,7 @@ export function getOfflineHomeUrl(topSites: HistoryItem[] = []): string {
         grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
         gap: 16px;
       }
-      
+
       .site-card {
         background: var(--bg-card);
         border: 1px solid var(--border);
@@ -385,10 +431,11 @@ export function getOfflineHomeUrl(topSites: HistoryItem[] = []): string {
               autofocus
               autocomplete="off"
             >
-            <button type="submit" class="search-btn">Search</button>
-          </form>
-        </div>
-      </div>
+	            <button type="submit" class="search-btn">Search</button>
+	          </form>
+	          <div class="suggestions" id="suggestions" role="listbox" aria-label="Search suggestions"></div>
+	        </div>
+	      </div>
       
       <div class="shortcuts-section">
         <div class="section-header">
@@ -414,12 +461,127 @@ export function getOfflineHomeUrl(topSites: HistoryItem[] = []): string {
     </div>
     
     <script>
-      // Focus search on load
-      document.querySelector('.search-input').focus();
-      
-      // Handle form submission for internal URLs
-      document.querySelector('.search-form').addEventListener('submit', function(e) {
-        const query = document.querySelector('.search-input').value.trim();
+	      // Focus search on load
+	      document.querySelector('.search-input').focus();
+
+	      // Google suggestions
+	      (function () {
+	        var input = document.querySelector('.search-input');
+	        var box = document.getElementById('suggestions');
+	        if (!input || !box) return;
+
+	        var timer = null;
+	        var fetchId = 0;
+	        var active = -1;
+	        var items = [];
+
+	        function hide() {
+	          box.classList.remove('show');
+	          box.innerHTML = '';
+	          active = -1;
+	          items = [];
+	        }
+
+	        function show(list) {
+	          items = Array.isArray(list) ? list.filter(function (v) { return typeof v === 'string'; }).slice(0, 8) : [];
+	          if (items.length === 0) {
+	            hide();
+	            return;
+	          }
+	          box.innerHTML = items
+	            .map(function (s, idx) {
+	              var safe = String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+	              return '<button type="button" class="suggestion-item" data-idx="' + idx + '">' + safe + '</button>';
+	            })
+	            .join('');
+	          box.classList.add('show');
+	          active = -1;
+	        }
+
+	        function updateActive() {
+	          var nodes = box.querySelectorAll('.suggestion-item');
+	          for (var i = 0; i < nodes.length; i++) {
+	            if (i === active) nodes[i].classList.add('active');
+	            else nodes[i].classList.remove('active');
+	          }
+	        }
+
+	        input.addEventListener('input', function () {
+	          var q = String(input.value || '').trim();
+	          if (timer) clearTimeout(timer);
+	          if (q.length < 2) {
+	            hide();
+	            return;
+	          }
+	          timer = setTimeout(function () {
+	            var id = ++fetchId;
+	            fetch('https://suggestqueries.google.com/complete/search?client=firefox&q=' + encodeURIComponent(q))
+	              .then(function (r) { return r.json(); })
+	              .then(function (data) {
+	                if (id !== fetchId) return;
+	                var list = Array.isArray(data) && Array.isArray(data[1]) ? data[1] : [];
+	                show(list);
+	              })
+	              .catch(function () {
+	                if (id !== fetchId) return;
+	                hide();
+	              });
+	          }, 140);
+	        });
+
+	        input.addEventListener('keydown', function (e) {
+	          if (!box.classList.contains('show')) return;
+	          if (e.key === 'Escape') {
+	            hide();
+	            return;
+	          }
+	          if (e.key === 'ArrowDown') {
+	            e.preventDefault();
+	            active = Math.min(items.length - 1, active + 1);
+	            updateActive();
+	            return;
+	          }
+	          if (e.key === 'ArrowUp') {
+	            e.preventDefault();
+	            active = Math.max(-1, active - 1);
+	            updateActive();
+	            return;
+	          }
+	          if (e.key === 'Enter' && active >= 0) {
+	            e.preventDefault();
+	            var val = items[active];
+	            if (val) {
+	              input.value = val;
+	              hide();
+	              try { location.href = 'https://www.google.com/search?q=' + encodeURIComponent(val); } catch (err) {}
+	            }
+	          }
+	        });
+
+	        box.addEventListener('mousedown', function (e) {
+	          e.preventDefault();
+	        });
+
+	        box.addEventListener('click', function (e) {
+	          var target = e.target;
+	          if (!target || !target.getAttribute) return;
+	          var idx = Number(target.getAttribute('data-idx') || '-1');
+	          if (idx < 0 || idx >= items.length) return;
+	          var val = items[idx];
+	          if (!val) return;
+	          input.value = val;
+	          hide();
+	          try { location.href = 'https://www.google.com/search?q=' + encodeURIComponent(val); } catch (err) {}
+	        });
+
+	        input.addEventListener('blur', function () {
+	          setTimeout(hide, 160);
+	        });
+	      })();
+	      
+	      // Handle form submission for internal URLs
+	      document.querySelector('.search-form').addEventListener('submit', function(e) {
+	        const query = document.querySelector('.search-input').value.trim();
         if (!query) {
           e.preventDefault();
           return;
@@ -436,37 +598,44 @@ export function getOfflineHomeUrl(topSites: HistoryItem[] = []): string {
         // Otherwise let it go to Google search
       });
 
-      // Most visited interactions
-      document.querySelectorAll('.site-card').forEach(function(card) {
-        card.addEventListener('click', function(e) {
-          var target = e.target;
-          var actionBtn = target && target.closest ? target.closest('.site-action') : null;
-          if (actionBtn) {
-            e.preventDefault();
-            e.stopPropagation();
-            var action = actionBtn.getAttribute('data-action') || '';
-            if (actionBtn.classList.contains('remove')) {
-              if (!confirm('Remove this site from Most Visited?')) return;
-            }
-            try { location.href = action; } catch (err) {}
-            return;
-          }
-          var url = card.getAttribute('data-url') || '';
-          if (url) {
-            try { location.href = url; } catch (err) {}
-          }
-        });
+      // Most visited interactions (event delegation)
+	      var grid = document.querySelector('.sites-grid');
+	      if (grid) {
+	        grid.addEventListener('click', function(e) {
+	          var target = e.target;
+	          var actionBtn = target && target.closest ? target.closest('.site-action') : null;
+	          if (actionBtn) {
+	            e.preventDefault();
+	            e.stopPropagation();
+	            var action = actionBtn.getAttribute('data-action') || '';
+	            if (actionBtn.classList.contains('remove')) {
+	              if (!confirm('Remove this site from Most Visited?')) return;
+	            }
+	            try { location.href = action; } catch (err) {}
+	            return;
+	          }
 
-        card.addEventListener('keydown', function(e) {
-          if (e.key === 'Enter') {
-            e.preventDefault();
+          var card = target && target.closest ? target.closest('.site-card') : null;
+          if (card) {
             var url = card.getAttribute('data-url') || '';
             if (url) {
               try { location.href = url; } catch (err) {}
             }
           }
         });
-      });
+
+        grid.addEventListener('keydown', function(e) {
+          if (e.key !== 'Enter' && e.key !== ' ') return;
+          var target = e.target;
+          var card = target && target.closest ? target.closest('.site-card') : null;
+          if (!card) return;
+          e.preventDefault();
+          var url = card.getAttribute('data-url') || '';
+          if (url) {
+            try { location.href = url; } catch (err) {}
+          }
+        });
+      }
     </script>
   </body>
 </html>`

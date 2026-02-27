@@ -17,7 +17,7 @@ export interface WebViewRef {
 
 type InternalAction =
   | { type: 'bookmark'; tabId: string; url: string; title?: string; favicon?: string }
-  | { type: 'remove-most-visited'; tabId: string; url: string }
+  | { type: 'remove-most-visited'; tabId: string; url?: string; host?: string }
 
 interface WebViewContainerProps {
   tabs: Tab[]
@@ -237,6 +237,10 @@ function WebViewInstance({
       'new-window': (e) => {
         e.preventDefault()
         if (e.url && e.url !== 'about:blank') {
+          if (typeof e.url === 'string' && e.url.startsWith('brah://')) {
+            webview.loadURL(resolveInternalUrl(e.url))
+            return
+          }
           if (onNewTab && (e.disposition === 'new-window' || e.disposition === 'foreground-tab')) {
             onNewTab(e.url)
           } else {
@@ -265,8 +269,14 @@ function WebViewInstance({
             }
             if (u.hostname === 'remove-most-visited') {
               e.preventDefault()
-              const url = u.searchParams.get('url') ?? ''
-              const detail: InternalAction = { type: 'remove-most-visited', tabId: tab.id, url }
+              const url = u.searchParams.get('url') ?? undefined
+              const host = u.searchParams.get('host') ?? undefined
+              const detail: InternalAction = {
+                type: 'remove-most-visited',
+                tabId: tab.id,
+                url,
+                host
+              }
               window.dispatchEvent(new CustomEvent('brah:internal-action', { detail }))
               return
             }

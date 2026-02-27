@@ -1,4 +1,4 @@
-import { useState, useEffect, JSX } from 'react'
+import { useMemo, useRef, useState, useEffect, JSX } from 'react'
 import '../styles/NavigationBar.css'
 
 interface NavigationBarProps {
@@ -38,14 +38,80 @@ export function NavigationBar({
   onShowDownloads,
   onShowSettings
 }: NavigationBarProps): JSX.Element {
-  const [inputValue, setInputValue] = useState(url)
+  const [draftValue, setDraftValue] = useState('')
+  const [isEditing, setIsEditing] = useState(false)
+  const [suggestions, setSuggestions] = useState<string[]>([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const [highlightedIndex, setHighlightedIndex] = useState(-1)
+  const debounceTimerRef = useRef<number | null>(null)
+  const fetchIdRef = useRef(0)
+  const cacheRef = useRef<Map<string, string[]>>(new Map())
+
+  const inputValue = isEditing ? draftValue : url
+
+  const shouldSuggest = useMemo(() => {
+    if (!isEditing) return false
+    const trimmed = draftValue.trim()
+    if (trimmed.length < 2) return false
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return false
+    if (trimmed.startsWith('brah://')) return false
+    if (trimmed.startsWith('file://')) return false
+    if (trimmed.startsWith('chrome://')) return false
+    return true
+  }, [draftValue, isEditing])
 
   useEffect(() => {
-    setInputValue(url)
-  }, [url])
+    if (!showSuggestions) return
+    if (!shouldSuggest) return
+
+    if (debounceTimerRef.current) {
+      window.clearTimeout(debounceTimerRef.current)
+    }
+
+    const query = draftValue.trim()
+    debounceTimerRef.current = window.setTimeout(async () => {
+      const cached = cacheRef.current.get(query)
+      if (cached) {
+        setSuggestions(cached)
+        setHighlightedIndex(-1)
+        return
+      }
+
+      const fetchId = ++fetchIdRef.current
+      try {
+        const res = await fetch(
+          `https://suggestqueries.google.com/complete/search?client=firefox&q=${encodeURIComponent(
+            query
+          )}`
+        )
+        const data = (await res.json()) as unknown
+        if (fetchId !== fetchIdRef.current) return
+        const list =
+          Array.isArray(data) && Array.isArray((data as any)[1])
+            ? ((data as any)[1] as unknown[]).filter((v) => typeof v === 'string').slice(0, 8)
+            : []
+        cacheRef.current.set(query, list as string[])
+        setSuggestions(list as string[])
+        setHighlightedIndex(-1)
+      } catch {
+        if (fetchId !== fetchIdRef.current) return
+        setSuggestions([])
+        setHighlightedIndex(-1)
+      }
+    }, 140)
+
+    return () => {
+      if (debounceTimerRef.current) {
+        window.clearTimeout(debounceTimerRef.current)
+        debounceTimerRef.current = null
+      }
+    }
+  }, [draftValue, shouldSuggest, showSuggestions])
 
   const handleSubmit = (e: React.FormEvent): void => {
     e.preventDefault()
+    setShowSuggestions(false)
+    setIsEditing(false)
     onNavigate(inputValue)
   }
 
@@ -80,12 +146,73 @@ export function NavigationBar({
 
       <form className="address-bar" onSubmit={handleSubmit}>
         <div className="security-icon">{url.startsWith('https') ? '🔒' : '⚠️'}</div>
-        <input
-          type="text"
-          value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
-          placeholder="Search or enter address"
-        />
+        <div className="address-input-wrap">
+          <input
+            type="text"
+            value={inputValue}
+            onChange={(e) => setDraftValue(e.target.value)}
+            onFocus={() => {
+              setIsEditing(true)
+              setDraftValue(url)
+              setShowSuggestions(true)
+            }}
+            onBlur={() => {
+              window.setTimeout(() => setShowSuggestions(false), 120)
+              window.setTimeout(() => setIsEditing(false), 160)
+            }}
+            onKeyDown={(e) => {
+              if (!showSuggestions || suggestions.length === 0) return
+              if (e.key === 'Escape') {
+                setShowSuggestions(false)
+                setHighlightedIndex(-1)
+                return
+              }
+              if (e.key === 'ArrowDown') {
+                e.preventDefault()
+                setHighlightedIndex((idx) => Math.min(suggestions.length - 1, idx + 1))
+                return
+              }
+              if (e.key === 'ArrowUp') {
+                e.preventDefault()
+                setHighlightedIndex((idx) => Math.max(-1, idx - 1))
+                return
+              }
+              if (e.key === 'Enter' && highlightedIndex >= 0) {
+                e.preventDefault()
+                const value = suggestions[highlightedIndex]
+                setDraftValue(value)
+                setShowSuggestions(false)
+                setIsEditing(false)
+                onNavigate(value)
+              }
+            }}
+            placeholder="Search or enter address"
+            aria-autocomplete="list"
+            aria-expanded={showSuggestions && suggestions.length > 0}
+          />
+          {showSuggestions && suggestions.length > 0 && (
+            <div className="address-suggestions" role="listbox">
+              {suggestions.map((s, idx) => (
+                <button
+                  key={`${s}-${idx}`}
+                  type="button"
+                  className={`address-suggestion ${idx === highlightedIndex ? 'active' : ''}`}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    setDraftValue(s)
+                    setShowSuggestions(false)
+                    setIsEditing(false)
+                    onNavigate(s)
+                  }}
+                  role="option"
+                  aria-selected={idx === highlightedIndex}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </form>
 
       <div className="action-buttons">
