@@ -35,7 +35,7 @@ Get the latest version from [GitHub Releases](https://github.com/ViruSilvesteR/b
 | Platform | Installers | Packages |
 |----------|-----------|----------|
 | **Windows** | `.exe` (Setup) | `.zip` (Portable) |
-| **Linux** | `.AppImage` (Universal) | `.deb` (Debian/Ubuntu), `.rpm` (Fedora), `.snap` (Snap Store) |
+| **Linux** | `.AppImage` (Universal) | `.deb` (Debian/Ubuntu) |
 
 > **Note:** macOS builds are not currently available. Contributions welcome!
 
@@ -70,7 +70,7 @@ Get the latest version from [GitHub Releases](https://github.com/ViruSilvesteR/b
 
 ```bash
 # Clone the repository
-git clone https://github.com/ViruSilvesteR/brah-browser.git
+git clone https://github.com/ViruSilvesteR/brah-brower.git
 cd brah-browser
 
 # Install dependencies
