@@ -21,8 +21,19 @@ interface WindowState {
   isFullScreen: boolean
 }
 
+// Settings interface
+interface AppSettings {
+  theme: 'dark' | 'light'
+  searchEngine: string
+  homepage: string
+  downloadPath?: string
+  enableAdBlock?: boolean
+  enableNotifications?: boolean
+  spellcheck?: boolean
+}
+
 // Initialize store with defaults
-const store = new Store<WindowState & { downloads: DownloadItemData[] }>({
+const store = new Store<WindowState & { downloads: DownloadItemData[]; settings: AppSettings }>({
   name: 'brah-browser-state',
   defaults: {
     width: 1400,
@@ -31,7 +42,15 @@ const store = new Store<WindowState & { downloads: DownloadItemData[] }>({
     y: undefined,
     isMaximized: false,
     isFullScreen: false,
-    downloads: []
+    downloads: [],
+    settings: {
+      theme: 'dark',
+      searchEngine: 'google',
+      homepage: 'https://www.google.com',
+      enableAdBlock: false,
+      enableNotifications: true,
+      spellcheck: true
+    }
   }
 })
 
@@ -124,7 +143,11 @@ function createWindow(): BrowserWindow {
 
   setupWindowControls(mainWindow)
   setupStorageAPI()
+  setupSettingsAPI()
   setupExternalLinks(mainWindow)
+
+  // Set up download handling for the default session of this window
+  downloadManager.ensureDownloadHandlingForSession(mainWindow.webContents.session)
 
   if (process.env.VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL)
@@ -188,7 +211,7 @@ function setupContextMenuForWebContents(
         {
           label: 'Save Image As...',
           click: () => {
-            // Trigger download via webview
+            // Use downloadURL to trigger the download through the session
             contents.downloadURL(params.srcURL)
           }
         },
@@ -299,7 +322,6 @@ function setupContextMenuForWebContents(
         {
           label: 'Save Page As...',
           click: () => {
-            // This would need a save dialog implementation
             window.webContents.send('save-page-requested')
           }
         },
@@ -413,9 +435,62 @@ function setupStorageAPI(): void {
   })
 }
 
+// NEW: Settings API for persistent settings
+function setupSettingsAPI(): void {
+  ipcMain.handle('settings:get', () => {
+    try {
+      return store.get('settings')
+    } catch {
+      return null
+    }
+  })
+
+  ipcMain.handle('settings:set', (_event, newSettings: Partial<AppSettings>) => {
+    try {
+      const currentSettings = store.get('settings')
+      const updatedSettings = { ...currentSettings, ...newSettings }
+      store.set('settings', updatedSettings)
+
+      // Broadcast settings change to all windows
+      BrowserWindow.getAllWindows().forEach((win) => {
+        win.webContents.send('settings:changed', updatedSettings)
+      })
+
+      return updatedSettings
+    } catch (err) {
+      console.error('Settings save error:', err)
+      return null
+    }
+  })
+
+  ipcMain.handle('settings:reset', () => {
+    try {
+      const defaultSettings: AppSettings = {
+        theme: 'dark',
+        searchEngine: 'google',
+        homepage: 'https://www.google.com',
+        enableAdBlock: false,
+        enableNotifications: true,
+        spellcheck: true
+      }
+      store.set('settings', defaultSettings)
+
+      BrowserWindow.getAllWindows().forEach((win) => {
+        win.webContents.send('settings:changed', defaultSettings)
+      })
+
+      return defaultSettings
+    } catch (err) {
+      console.error('Settings reset error:', err)
+      return null
+    }
+  })
+}
+
 function setupExternalLinks(window: BrowserWindow): void {
   // Add context menu for main window webContents
   setupContextMenuForWebContents(window.webContents, window)
+
   window.webContents.setWindowOpenHandler(({ url, disposition }) => {
     if (disposition === 'new-window' || disposition === 'foreground-tab') {
       return {
@@ -438,6 +513,7 @@ function setupExternalLinks(window: BrowserWindow): void {
     return { action: 'deny' }
   })
 
+  // Prevent navigation away from the app in main window
   window.webContents.on('will-navigate', (event, url) => {
     if (url !== window.webContents.getURL()) {
       event.preventDefault()
@@ -457,7 +533,10 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
 })
 
+// CRITICAL FIX: Handle web contents creation properly
 app.on('web-contents-created', (_event, contents) => {
+  // Set up download handling for this specific session
+  // This catches webviews and other guest contents
   downloadManager.ensureDownloadHandlingForSession(contents.session)
 
   if (contents.getType() === 'webview') {
@@ -468,6 +547,32 @@ app.on('web-contents-created', (_event, contents) => {
     if (window) {
       setupContextMenuForWebContents(contents, window)
     }
+
+    // IMPORTANT: Handle navigation to direct file URLs (ZIP, PDF, etc.)
+    // This prevents ERR_FAILED when clicking direct download links
+    contents.on('will-navigate', (event, url) => {
+      // Check if URL is a direct file link that should be downloaded
+      const directFileExtensions = [
+        '.zip',
+        '.tar.gz',
+        '.tar.bz2',
+        '.7z',
+        '.rar',
+        '.exe',
+        '.dmg',
+        '.pkg',
+        '.deb',
+        '.rpm'
+      ]
+      const isDirectFile = directFileExtensions.some((ext) => url.toLowerCase().endsWith(ext))
+
+      if (isDirectFile) {
+        event.preventDefault()
+        console.log(`Intercepted direct file download: ${url}`)
+        // Trigger download through the session
+        contents.downloadURL(url)
+      }
+    })
 
     contents.setWindowOpenHandler(({ url, disposition, frameName }) => {
       // Prevent popups/new windows from the webview; renderer handles tab creation via the

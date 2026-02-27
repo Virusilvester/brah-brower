@@ -1,4 +1,4 @@
-import { useState, JSX } from 'react'
+import { useState, useEffect, JSX } from 'react'
 import '../styles/Panel.css'
 
 interface SettingsPanelProps {
@@ -6,43 +6,121 @@ interface SettingsPanelProps {
 }
 
 export function SettingsPanel({ onClose }: SettingsPanelProps): JSX.Element {
-  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
-    const saved = localStorage.getItem('brah-settings')
-    if (!saved) return 'dark'
-    try {
-      const settings = JSON.parse(saved)
-      return settings.theme === 'light' ? 'light' : 'dark'
-    } catch {
-      return 'dark'
-    }
+  const [settings, setSettings] = useState({
+    theme: 'dark' as 'dark' | 'light',
+    searchEngine: 'google',
+    homepage: 'https://www.google.com',
+    enableAdBlock: false,
+    enableNotifications: true,
+    spellcheck: true,
+    downloadPath: ''
   })
+  const [isLoading, setIsLoading] = useState(true)
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
 
-  const [searchEngine, setSearchEngine] = useState(() => {
-    const saved = localStorage.getItem('brah-settings')
-    if (!saved) return 'google'
-    try {
-      const settings = JSON.parse(saved)
-      return typeof settings.searchEngine === 'string' ? settings.searchEngine : 'google'
-    } catch {
-      return 'google'
+  // Load settings on mount
+  useEffect(() => {
+    const loadSettings = async (): Promise<void> => {
+      try {
+        const saved = await window.settings?.get()
+        if (saved) {
+          setSettings((prev) => ({ ...prev, ...saved }))
+          // Apply theme immediately
+          applyTheme(saved.theme)
+        } else {
+          // Fallback to localStorage
+          const local = localStorage.getItem('brah-settings')
+          if (local) {
+            const parsed = JSON.parse(local)
+            setSettings((prev) => ({ ...prev, ...parsed }))
+            applyTheme(parsed.theme)
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load settings:', error)
+      } finally {
+        setIsLoading(false)
+      }
     }
-  })
+    loadSettings()
 
-  const [homepage, setHomepage] = useState(() => {
-    const saved = localStorage.getItem('brah-settings')
-    if (!saved) return 'https://www.google.com'
-    try {
-      const settings = JSON.parse(saved)
-      return typeof settings.homepage === 'string' ? settings.homepage : 'https://www.google.com'
-    } catch {
-      return 'https://www.google.com'
+    // Listen for settings changes from other windows
+    const cleanup = window.settings?.onChange((newSettings) => {
+      setSettings((prev) => ({ ...prev, ...newSettings }))
+      applyTheme(newSettings.theme)
+    })
+
+    return () => {
+      if (cleanup) cleanup()
     }
-  })
+  }, [])
 
-  const saveSettings = (): void => {
-    const settings = { theme, searchEngine, homepage }
-    localStorage.setItem('brah-settings', JSON.stringify(settings))
-    onClose()
+  const applyTheme = (theme: 'dark' | 'light'): void => {
+    document.documentElement.setAttribute('data-theme', theme)
+    document.body.classList.remove('dark', 'light')
+    document.body.classList.add(theme)
+  }
+
+  const handleChange = (key: string, value: any): void => {
+    setSettings((prev) => ({ ...prev, [key]: value }))
+    // Apply theme immediately for preview
+    if (key === 'theme') {
+      applyTheme(value)
+    }
+  }
+
+  const saveSettings = async (): Promise<void> => {
+    setSaveStatus('saving')
+    try {
+      // Save to electron-store via IPC
+      if (window.settings) {
+        await window.settings.set(settings)
+      }
+      // Also save to localStorage as backup
+      localStorage.setItem('brah-settings', JSON.stringify(settings))
+
+      setSaveStatus('saved')
+      setTimeout(() => setSaveStatus('idle'), 1000)
+      onClose()
+    } catch (error) {
+      console.error('Failed to save settings:', error)
+      setSaveStatus('idle')
+    }
+  }
+
+  const resetSettings = async (): Promise<void> => {
+    if (confirm('Are you sure you want to reset all settings to defaults?')) {
+      try {
+        const defaults = await window.settings?.reset()
+        if (defaults) {
+          setSettings(defaults)
+          applyTheme(defaults.theme)
+        }
+      } catch (error) {
+        console.error('Failed to reset settings:', error)
+      }
+    }
+  }
+
+  const selectDownloadPath = async (): Promise<void> => {
+    // This would need a file dialog API exposed to renderer
+    // For now, we'll just use a text input
+  }
+
+  if (isLoading) {
+    return (
+      <div className="panel settings-panel">
+        <div className="panel-header">
+          <h3>Settings</h3>
+          <button className="close-btn" onClick={onClose}>
+            ×
+          </button>
+        </div>
+        <div className="panel-content">
+          <div className="loading-state">Loading settings...</div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -55,31 +133,112 @@ export function SettingsPanel({ onClose }: SettingsPanelProps): JSX.Element {
       </div>
 
       <div className="panel-content settings-content">
-        <div className="setting-item">
-          <label>Theme</label>
-          <select value={theme} onChange={(e) => setTheme(e.target.value as any)}>
-            <option value="dark">Dark</option>
-            <option value="light">Light</option>
-          </select>
-        </div>
+        <section className="settings-section">
+          <h4>Appearance</h4>
+          <div className="setting-item">
+            <label htmlFor="theme">Theme</label>
+            <select
+              id="theme"
+              value={settings.theme}
+              onChange={(e) => handleChange('theme', e.target.value)}
+            >
+              <option value="dark">Dark</option>
+              <option value="light">Light</option>
+              <option value="system">System Default</option>
+            </select>
+          </div>
+        </section>
 
-        <div className="setting-item">
-          <label>Search Engine</label>
-          <select value={searchEngine} onChange={(e) => setSearchEngine(e.target.value)}>
-            <option value="google">Google</option>
-            <option value="duckduckgo">DuckDuckGo</option>
-            <option value="bing">Bing</option>
-          </select>
-        </div>
+        <section className="settings-section">
+          <h4>Search & Navigation</h4>
+          <div className="setting-item">
+            <label htmlFor="searchEngine">Default Search Engine</label>
+            <select
+              id="searchEngine"
+              value={settings.searchEngine}
+              onChange={(e) => handleChange('searchEngine', e.target.value)}
+            >
+              <option value="google">Google</option>
+              <option value="duckduckgo">DuckDuckGo</option>
+              <option value="bing">Bing</option>
+              <option value="brave">Brave Search</option>
+              <option value="ecosia">Ecosia</option>
+            </select>
+          </div>
 
-        <div className="setting-item">
-          <label>Homepage</label>
-          <input type="text" value={homepage} onChange={(e) => setHomepage(e.target.value)} />
-        </div>
+          <div className="setting-item">
+            <label htmlFor="homepage">Homepage</label>
+            <input
+              id="homepage"
+              type="text"
+              value={settings.homepage}
+              onChange={(e) => handleChange('homepage', e.target.value)}
+              placeholder="https://www.google.com"
+            />
+          </div>
+        </section>
 
-        <button className="save-btn" onClick={saveSettings}>
-          Save Settings
-        </button>
+        <section className="settings-section">
+          <h4>Privacy & Security</h4>
+          <div className="setting-item checkbox">
+            <label>
+              <input
+                type="checkbox"
+                checked={settings.enableAdBlock}
+                onChange={(e) => handleChange('enableAdBlock', e.target.checked)}
+              />
+              Enable Ad Blocker (Experimental)
+            </label>
+          </div>
+          <div className="setting-item checkbox">
+            <label>
+              <input
+                type="checkbox"
+                checked={settings.enableNotifications}
+                onChange={(e) => handleChange('enableNotifications', e.target.checked)}
+              />
+              Allow Website Notifications
+            </label>
+          </div>
+          <div className="setting-item checkbox">
+            <label>
+              <input
+                type="checkbox"
+                checked={settings.spellcheck}
+                onChange={(e) => handleChange('spellcheck', e.target.checked)}
+              />
+              Enable Spell Check
+            </label>
+          </div>
+        </section>
+
+        <section className="settings-section">
+          <h4>Downloads</h4>
+          <div className="setting-item">
+            <label htmlFor="downloadPath">Default Download Location</label>
+            <input
+              id="downloadPath"
+              type="text"
+              value={settings.downloadPath || ''}
+              onChange={(e) => handleChange('downloadPath', e.target.value)}
+              placeholder="Downloads folder"
+            />
+            <small>Leave empty to use system Downloads folder</small>
+          </div>
+        </section>
+
+        <div className="settings-actions">
+          <button className="save-btn" onClick={saveSettings} disabled={saveStatus === 'saving'}>
+            {saveStatus === 'saving'
+              ? 'Saving...'
+              : saveStatus === 'saved'
+                ? 'Saved!'
+                : 'Save Settings'}
+          </button>
+          <button className="reset-btn" onClick={resetSettings}>
+            Reset to Defaults
+          </button>
+        </div>
       </div>
     </div>
   )

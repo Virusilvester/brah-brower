@@ -13,16 +13,18 @@ export interface DownloadItemData {
   url: string
   canResume?: boolean
   paused?: boolean
+  startTime?: number
 }
 
-function getSessionKey(sessionToHandle: Electron.Session): string {
-  const partition = (sessionToHandle as unknown as { getPartition?: () => string }).getPartition?.()
-  if (typeof partition === 'string') return partition || 'default'
+// Use a more robust session identifier
+const sessionRegistry = new WeakSet<Electron.Session>()
 
-  const partitionProp = (sessionToHandle as unknown as { partition?: string }).partition
-  if (typeof partitionProp === 'string') return partitionProp || 'default'
+function hasDownloadHandler(session: Electron.Session): boolean {
+  return sessionRegistry.has(session)
+}
 
-  return 'default'
+function markSessionAsHandled(session: Electron.Session): void {
+  sessionRegistry.add(session)
 }
 
 function getOwningWindowForWebContents(contents: Electron.WebContents): BrowserWindow | null {
@@ -50,33 +52,49 @@ export interface DownloadManager {
 
 export function createDownloadManager(): DownloadManager {
   const activeDownloads = new Map<string, { item: Electron.DownloadItem; data: DownloadItemData }>()
-  const sessionsWithDownloadHandlers = new Set<string>()
   const handledDownloadItems = new WeakSet<Electron.DownloadItem>()
   let downloadIpcHandlersRegistered = false
 
   const ensureDownloadHandlingForSession = (sessionToHandle: Electron.Session): void => {
-    const sessionKey = getSessionKey(sessionToHandle)
-    if (sessionsWithDownloadHandlers.has(sessionKey)) return
-    sessionsWithDownloadHandlers.add(sessionKey)
+    // Use WeakSet to track handled sessions - more reliable than string keys
+    if (hasDownloadHandler(sessionToHandle)) {
+      return
+    }
 
-    sessionToHandle.on('will-download', async (_event, item, webContents) => {
+    markSessionAsHandled(sessionToHandle)
+    console.log(`Setting up download handler for new session`)
+
+    sessionToHandle.on('will-download', async (event, item, webContents) => {
       // Guard against duplicate handlers causing the same DownloadItem to be processed multiple times.
-      if (handledDownloadItems.has(item)) return
+      if (handledDownloadItems.has(item)) {
+        console.log('Download item already handled, skipping')
+        return
+      }
       handledDownloadItems.add(item)
 
       const ownerWindow = getOwningWindowForWebContents(webContents)
-      if (!ownerWindow || ownerWindow.isDestroyed()) return
+      if (!ownerWindow || ownerWindow.isDestroyed()) {
+        console.log('No valid owner window for download')
+        item.cancel()
+        return
+      }
 
       const id = crypto.randomUUID()
       const fileName = item.getFilename()
+      const url = item.getURL()
 
-      const { filePath } = await dialog.showSaveDialog(ownerWindow, {
+      console.log(`Starting download: ${fileName} from ${url}`)
+
+      // Show save dialog
+      const { filePath, canceled } = await dialog.showSaveDialog(ownerWindow, {
         defaultPath: fileName,
         buttonLabel: 'Save',
-        title: 'Save Download'
+        title: 'Save Download',
+        properties: ['createDirectory', 'showOverwriteConfirmation']
       })
 
-      if (!filePath) {
+      if (canceled || !filePath) {
+        console.log('Download cancelled by user')
         item.cancel()
         return
       }
@@ -91,14 +109,20 @@ export function createDownloadManager(): DownloadManager {
         path: filePath,
         totalBytes: item.getTotalBytes(),
         receivedBytes: 0,
-        url: item.getURL(),
+        url: url,
         canResume: false,
-        paused: false
+        paused: false,
+        startTime: Date.now()
       }
 
       activeDownloads.set(id, { item, data: downloadData })
-      ownerWindow.webContents.send('download:started', downloadData)
 
+      // Notify renderer
+      if (!ownerWindow.isDestroyed()) {
+        ownerWindow.webContents.send('download:started', downloadData)
+      }
+
+      // Handle updates
       item.on('updated', (_event, state) => {
         const received = item.getReceivedBytes()
         const total = item.getTotalBytes()
@@ -115,10 +139,15 @@ export function createDownloadManager(): DownloadManager {
         }
 
         activeDownloads.set(id, { item, data: updated })
-        if (!ownerWindow.isDestroyed()) ownerWindow.webContents.send('download:progress', updated)
+        if (!ownerWindow.isDestroyed()) {
+          ownerWindow.webContents.send('download:progress', updated)
+        }
       })
 
+      // Handle completion
       item.once('done', (_event, state) => {
+        console.log(`Download ${id} finished with state: ${state}`)
+
         const final: DownloadItemData = {
           ...downloadData,
           state: state as DownloadItemData['state'],
@@ -128,7 +157,9 @@ export function createDownloadManager(): DownloadManager {
         }
 
         activeDownloads.delete(id)
-        if (!ownerWindow.isDestroyed()) ownerWindow.webContents.send('download:completed', final)
+        if (!ownerWindow.isDestroyed()) {
+          ownerWindow.webContents.send('download:completed', final)
+        }
       })
     })
   }
@@ -138,7 +169,7 @@ export function createDownloadManager(): DownloadManager {
     downloadIpcHandlersRegistered = true
 
     ipcMain.handle('download:open', (_event, filePath: string) => {
-      if (!validateFilePath(filePath)) return
+      if (!validateFilePath(filePath)) return { success: false, error: 'Invalid path' }
       return shell.openPath(filePath)
     })
 
@@ -151,14 +182,18 @@ export function createDownloadManager(): DownloadManager {
       const download = activeDownloads.get(id)
       if (download && !download.item.isPaused()) {
         download.item.pause()
+        return { success: true }
       }
+      return { success: false, error: 'Download not found or already paused' }
     })
 
     ipcMain.handle('download:resume', (_event, id: string) => {
       const download = activeDownloads.get(id)
       if (download && download.item.canResume()) {
         download.item.resume()
+        return { success: true }
       }
+      return { success: false, error: 'Download not found or cannot resume' }
     })
 
     ipcMain.handle('download:cancel', (_event, id: string) => {
@@ -166,7 +201,9 @@ export function createDownloadManager(): DownloadManager {
       if (download) {
         download.item.cancel()
         activeDownloads.delete(id)
+        return { success: true }
       }
+      return { success: false, error: 'Download not found' }
     })
   }
 

@@ -9,6 +9,17 @@ export interface DownloadItem {
   url: string
   canResume?: boolean
   paused?: boolean
+  startTime?: number
+}
+
+export interface AppSettings {
+  theme: 'dark' | 'light'
+  searchEngine: string
+  homepage: string
+  downloadPath?: string
+  enableAdBlock?: boolean
+  enableNotifications?: boolean
+  spellcheck?: boolean
 }
 
 export interface WindowControlsAPI {
@@ -25,14 +36,21 @@ export interface DownloadsAPI {
   onCompleted: (callback: (data: DownloadItem) => void) => () => void
   openFile: (filePath: string) => Promise<void>
   showInFolder: (filePath: string) => Promise<void>
-  pause: (id: string) => Promise<void>
-  resume: (id: string) => Promise<void>
-  cancel: (id: string) => Promise<void>
+  pause: (id: string) => Promise<{ success: boolean; error?: string }>
+  resume: (id: string) => Promise<{ success: boolean; error?: string }>
+  cancel: (id: string) => Promise<{ success: boolean; error?: string }>
 }
 
 export interface StorageAPI {
   get: <T>(key: string) => Promise<T | null>
   set: <T>(key: string, value: T) => Promise<void>
+}
+
+export interface SettingsAPI {
+  get: () => Promise<AppSettings | null>
+  set: (settings: Partial<AppSettings>) => Promise<AppSettings | null>
+  reset: () => Promise<AppSettings | null>
+  onChange: (callback: (settings: AppSettings) => void) => () => void
 }
 
 export interface BrowserEventsAPI {
@@ -44,6 +62,7 @@ declare global {
     windowControls: WindowControlsAPI
     downloads: DownloadsAPI
     storage: StorageAPI
+    settings: SettingsAPI
     browserEvents: BrowserEventsAPI
   }
 }
