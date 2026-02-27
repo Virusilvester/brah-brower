@@ -56,6 +56,7 @@ export interface DownloadsAPI {
   onProgress: (callback: (data: DownloadItem) => void) => () => void
   onCompleted: (callback: (data: DownloadItem) => void) => () => void
   clearCompleted: () => Promise<DownloadItem[]>
+  clearAll: () => Promise<DownloadItem[]>
   remove: (id: string) => Promise<{ success: boolean; error?: string }>
   delete: (id: string, filePath: string) => Promise<{ success: boolean; error?: string }>
   openFile: (filePath: string) => Promise<void>
@@ -113,6 +114,7 @@ contextBridge.exposeInMainWorld('downloads', {
     return () => ipcRenderer.removeListener('download:completed', handler)
   },
   clearCompleted: () => ipcRenderer.invoke('downloads:clear-completed'),
+  clearAll: () => ipcRenderer.invoke('downloads:clear-all'),
   remove: (id: string) => ipcRenderer.invoke('downloads:remove', id),
   delete: (id: string, filePath: string) => ipcRenderer.invoke('downloads:delete', id, filePath),
   openFile: (filePath: string) => ipcRenderer.invoke('download:open', filePath),
@@ -139,6 +141,11 @@ contextBridge.exposeInMainWorld('settings', {
     return () => ipcRenderer.removeListener('settings:changed', handler)
   }
 } as SettingsAPI)
+
+// Privacy API
+contextBridge.exposeInMainWorld('privacy', {
+  clearData: (options: any) => ipcRenderer.invoke('privacy:clear-data', options)
+} as any)
 
 // Browser events API
 contextBridge.exposeInMainWorld('browserEvents', {

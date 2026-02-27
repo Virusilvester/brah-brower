@@ -121,6 +121,11 @@ export function createDownloadManager(persistence?: DownloadPersistenceAdapter):
     return next
   }
 
+  const clearAllPersistedDownloads = (): DownloadItemData[] => {
+    setPersistedDownloads([])
+    return []
+  }
+
   const getDefaultDownloadDirectory = (): string => {
     const fromSettings = persistence?.getDefaultDirectory?.()
     if (fromSettings && typeof fromSettings === 'string' && path.isAbsolute(fromSettings)) {
@@ -323,6 +328,8 @@ export function createDownloadManager(persistence?: DownloadPersistenceAdapter):
     ipcMain.handle('downloads:get-all', () => getPersistedDownloads())
 
     ipcMain.handle('downloads:clear-completed', () => clearCompletedPersistedDownloads())
+
+    ipcMain.handle('downloads:clear-all', () => clearAllPersistedDownloads())
 
     ipcMain.handle('downloads:remove', (_event, id: string) => {
       removePersistedDownload(id)

@@ -36,6 +36,7 @@ export interface DownloadsAPI {
   onProgress: (callback: (data: DownloadItem) => void) => () => void
   onCompleted: (callback: (data: DownloadItem) => void) => () => void
   clearCompleted: () => Promise<DownloadItem[]>
+  clearAll: () => Promise<DownloadItem[]>
   remove: (id: string) => Promise<{ success: boolean; error?: string }>
   delete: (id: string, filePath: string) => Promise<{ success: boolean; error?: string }>
   openFile: (filePath: string) => Promise<void>
@@ -61,6 +62,19 @@ export interface BrowserEventsAPI {
   onWebviewNewTab: (callback: (url: string) => void) => () => void
 }
 
+export interface ClearDataOptions {
+  history?: boolean
+  downloads?: boolean
+  bookmarks?: boolean
+  cookies?: boolean
+  cache?: boolean
+  siteData?: boolean
+}
+
+export interface PrivacyAPI {
+  clearData: (options: ClearDataOptions) => Promise<{ success: boolean; error?: string }>
+}
+
 declare global {
   interface Window {
     windowControls: WindowControlsAPI
@@ -68,6 +82,7 @@ declare global {
     storage: StorageAPI
     settings: SettingsAPI
     browserEvents: BrowserEventsAPI
+    privacy: PrivacyAPI
   }
 }
 

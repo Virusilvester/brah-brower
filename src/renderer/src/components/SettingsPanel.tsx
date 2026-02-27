@@ -27,6 +27,15 @@ export function SettingsPanel({ onClose }: SettingsPanelProps): JSX.Element {
   })
   const [isLoading, setIsLoading] = useState(true)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
+  const [clearOptions, setClearOptions] = useState({
+    history: true,
+    downloads: true,
+    bookmarks: true,
+    cookies: true,
+    cache: false,
+    siteData: true
+  })
+  const [clearStatus, setClearStatus] = useState<'idle' | 'clearing' | 'cleared'>('idle')
 
   // Load settings on mount
   useEffect(() => {
@@ -109,6 +118,73 @@ export function SettingsPanel({ onClose }: SettingsPanelProps): JSX.Element {
       } catch (error) {
         console.error('Failed to reset settings:', error)
       }
+    }
+  }
+
+  const toggleAllClearOptions = (checked: boolean): void => {
+    setClearOptions({
+      history: checked,
+      downloads: checked,
+      bookmarks: checked,
+      cookies: checked,
+      cache: checked,
+      siteData: checked
+    })
+  }
+
+  const clearSelectedData = async (): Promise<void> => {
+    const nothingSelected = Object.values(clearOptions).every((v) => !v)
+    if (nothingSelected) {
+      alert('Select at least one item to clear.')
+      return
+    }
+
+    if (!confirm('Clear selected data? This cannot be undone.')) return
+
+    setClearStatus('clearing')
+    const cleared: Record<string, boolean> = {}
+
+    try {
+      if (clearOptions.history) {
+        localStorage.removeItem('brah-history')
+        cleared.history = true
+      }
+
+      if (clearOptions.bookmarks) {
+        localStorage.removeItem('brah-bookmarks')
+        cleared.bookmarks = true
+      }
+
+      if (clearOptions.downloads) {
+        try {
+          await window.downloads?.clearAll?.()
+        } catch {
+          // ignore
+        }
+        cleared.downloads = true
+      }
+
+      if (clearOptions.cookies || clearOptions.cache || clearOptions.siteData) {
+        const result = await window.privacy?.clearData?.({
+          cookies: clearOptions.cookies,
+          cache: clearOptions.cache,
+          siteData: clearOptions.siteData
+        })
+        if (result && !result.success) {
+          throw new Error(result.error || 'Failed to clear browser data')
+        }
+        cleared.cookies = !!clearOptions.cookies
+        cleared.cache = !!clearOptions.cache
+        cleared.siteData = !!clearOptions.siteData
+      }
+
+      window.dispatchEvent(new CustomEvent('app:data-cleared', { detail: cleared }))
+      setClearStatus('cleared')
+      setTimeout(() => setClearStatus('idle'), 1200)
+    } catch (err) {
+      console.error('Clear data failed:', err)
+      alert(`Clear failed: ${String(err)}`)
+      setClearStatus('idle')
     }
   }
 
@@ -229,6 +305,100 @@ export function SettingsPanel({ onClose }: SettingsPanelProps): JSX.Element {
               placeholder="Downloads folder"
             />
             <small>Leave empty to use system Downloads folder</small>
+          </div>
+        </section>
+
+        <section className="settings-section">
+          <h4>Clear Data</h4>
+          <div className="setting-item checkbox">
+            <label>
+              <input
+                type="checkbox"
+                checked={Object.values(clearOptions).every(Boolean)}
+                onChange={(e) => toggleAllClearOptions(e.target.checked)}
+              />
+              Select all
+            </label>
+          </div>
+
+          <div className="setting-item checkbox">
+            <label>
+              <input
+                type="checkbox"
+                checked={clearOptions.history}
+                onChange={(e) => setClearOptions((p) => ({ ...p, history: e.target.checked }))}
+              />
+              History
+            </label>
+          </div>
+
+          <div className="setting-item checkbox">
+            <label>
+              <input
+                type="checkbox"
+                checked={clearOptions.downloads}
+                onChange={(e) => setClearOptions((p) => ({ ...p, downloads: e.target.checked }))}
+              />
+              Downloads list
+            </label>
+          </div>
+
+          <div className="setting-item checkbox">
+            <label>
+              <input
+                type="checkbox"
+                checked={clearOptions.bookmarks}
+                onChange={(e) => setClearOptions((p) => ({ ...p, bookmarks: e.target.checked }))}
+              />
+              Bookmarks
+            </label>
+          </div>
+
+          <div className="setting-item checkbox">
+            <label>
+              <input
+                type="checkbox"
+                checked={clearOptions.cookies}
+                onChange={(e) => setClearOptions((p) => ({ ...p, cookies: e.target.checked }))}
+              />
+              Cookies (sign out)
+            </label>
+          </div>
+
+          <div className="setting-item checkbox">
+            <label>
+              <input
+                type="checkbox"
+                checked={clearOptions.siteData}
+                onChange={(e) => setClearOptions((p) => ({ ...p, siteData: e.target.checked }))}
+              />
+              Site data (local storage)
+            </label>
+          </div>
+
+          <div className="setting-item checkbox">
+            <label>
+              <input
+                type="checkbox"
+                checked={clearOptions.cache}
+                onChange={(e) => setClearOptions((p) => ({ ...p, cache: e.target.checked }))}
+              />
+              Cache
+            </label>
+          </div>
+
+          <div className="settings-actions">
+            <button
+              className="save-btn"
+              onClick={clearSelectedData}
+              disabled={clearStatus === 'clearing'}
+            >
+              {clearStatus === 'clearing'
+                ? 'Clearing...'
+                : clearStatus === 'cleared'
+                  ? 'Cleared!'
+                  : 'Clear Selected'}
+            </button>
           </div>
         </section>
 

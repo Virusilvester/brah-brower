@@ -222,6 +222,10 @@ function App(): JSX.Element {
 function normalizeUrl(input: string): string {
   const trimmed = input.trim()
 
+  if (trimmed === '' || trimmed === 'brah://home') {
+    return 'brah://home'
+  }
+
   if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
     return trimmed
   }

@@ -2,6 +2,7 @@ import { useRef, useEffect, forwardRef, useImperativeHandle } from 'react'
 import type { JSX } from 'react'
 import type { Tab } from '../App'
 import '../styles/WebViewContainer.css'
+import { getLoadErrorUrl, isInternalDataUrl, resolveInternalUrl } from '../utils/internalPages'
 
 export interface WebViewRef {
   goBack: () => void
@@ -120,6 +121,7 @@ function WebViewInstance({
 }: WebViewInstanceProps): JSX.Element {
   const webviewRef = useRef<Electron.WebviewTag>(null)
   const isInitialized = useRef(false)
+  const isShowingInternalErrorPage = useRef(false)
 
   const webviewExtraProps = {
     allowpopups: true,
@@ -146,17 +148,60 @@ function WebViewInstance({
         }
       },
       'did-finish-load': () => {
+        isShowingInternalErrorPage.current = false
         try {
           onTitleChange(tab.id, webview.getTitle())
-          onUrlChange(tab.id, webview.getURL())
+          const current = webview.getURL()
+          if (!isInternalDataUrl(current)) {
+            onUrlChange(tab.id, current)
+          }
           onLoadingChange(tab.id, false)
           onNavigationStateChange(tab.id, webview.canGoBack(), webview.canGoForward())
         } catch (err) {
           console.error('Load finish error:', err)
         }
       },
+      'did-fail-provisional-load': (e) => {
+        // Ignore aborts (happens on redirects / user navigation).
+        if (e?.errorCode === -3) return
+        if (e?.isMainFrame === false) return
+        if (typeof e?.validatedURL === 'string' && isInternalDataUrl(e.validatedURL)) {
+          return
+        }
+        const attemptedUrl = (typeof e?.validatedURL === 'string' && e.validatedURL) || tab.url
+        onLoadingChange(tab.id, false)
+        onUrlChange(tab.id, attemptedUrl)
+        if (isShowingInternalErrorPage.current) return
+        isShowingInternalErrorPage.current = true
+        const errorUrl = getLoadErrorUrl({
+          attemptedUrl,
+          errorCode: Number(e?.errorCode ?? -1),
+          errorDescription: typeof e?.errorDescription === 'string' ? e.errorDescription : undefined
+        })
+        webview.loadURL(errorUrl)
+      },
+      'did-fail-load': (e) => {
+        if (e?.errorCode === -3) return
+        if (e?.isMainFrame === false) return
+        if (typeof e?.validatedURL === 'string' && isInternalDataUrl(e.validatedURL)) {
+          return
+        }
+        const attemptedUrl = (typeof e?.validatedURL === 'string' && e.validatedURL) || tab.url
+        onLoadingChange(tab.id, false)
+        onUrlChange(tab.id, attemptedUrl)
+        if (isShowingInternalErrorPage.current) return
+        isShowingInternalErrorPage.current = true
+        const errorUrl = getLoadErrorUrl({
+          attemptedUrl,
+          errorCode: Number(e?.errorCode ?? -1),
+          errorDescription: typeof e?.errorDescription === 'string' ? e.errorDescription : undefined
+        })
+        webview.loadURL(errorUrl)
+      },
       'did-navigate': (e) => {
-        onUrlChange(tab.id, e.url)
+        if (!isInternalDataUrl(e.url)) {
+          onUrlChange(tab.id, e.url)
+        }
         try {
           onNavigationStateChange(tab.id, webview.canGoBack(), webview.canGoForward())
         } catch (e) {
@@ -164,7 +209,9 @@ function WebViewInstance({
         }
       },
       'did-navigate-in-page': (e) => {
-        onUrlChange(tab.id, e.url)
+        if (!isInternalDataUrl(e.url)) {
+          onUrlChange(tab.id, e.url)
+        }
       },
       'page-favicon-updated': (e) => {
         if (e.favicons?.[0]) onFaviconChange(tab.id, e.favicons[0])
@@ -180,7 +227,9 @@ function WebViewInstance({
         }
       },
       'will-navigate': (e) => {
-        onUrlChange(tab.id, e.url)
+        if (!isInternalDataUrl(e.url)) {
+          onUrlChange(tab.id, e.url)
+        }
       },
       'dom-ready': () => {
         // Webview is ready
@@ -215,8 +264,9 @@ function WebViewInstance({
       // Sync URL if changed externally
       try {
         const currentUrl = webview.getURL()
-        if (currentUrl && currentUrl !== tab.url && tab.url !== 'about:blank') {
-          webview.loadURL(tab.url)
+        const targetUrl = resolveInternalUrl(tab.url)
+        if (currentUrl && currentUrl !== targetUrl && tab.url !== 'about:blank') {
+          webview.loadURL(targetUrl)
         }
       } catch (e) {
         console.error('URL sync error:', e)
@@ -231,7 +281,7 @@ function WebViewInstance({
     <webview
       {...webviewExtraProps}
       ref={webviewRef}
-      src={tab.url}
+      src={resolveInternalUrl(tab.url)}
       className="webview"
       style={{
         display: isActive ? 'flex' : 'none',

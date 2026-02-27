@@ -36,6 +36,15 @@ export function useBookmarks(): UseBookmarksResult {
     localStorage.setItem('brah-bookmarks', JSON.stringify(bookmarks))
   }, [bookmarks])
 
+  useEffect(() => {
+    const handler = (e: Event): void => {
+      const detail = (e as CustomEvent).detail as Record<string, unknown> | undefined
+      if (detail?.bookmarks) setBookmarks([])
+    }
+    window.addEventListener('app:data-cleared', handler as EventListener)
+    return () => window.removeEventListener('app:data-cleared', handler as EventListener)
+  }, [])
+
   const addBookmark = useCallback(
     (title: string, url: string, folder?: string) => {
       if (!url) return

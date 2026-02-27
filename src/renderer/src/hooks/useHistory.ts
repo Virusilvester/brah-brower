@@ -36,6 +36,15 @@ export function useHistory(): UseHistoryResult {
     localStorage.setItem('brah-history', JSON.stringify(history))
   }, [history])
 
+  useEffect(() => {
+    const handler = (e: Event): void => {
+      const detail = (e as CustomEvent).detail as Record<string, unknown> | undefined
+      if (detail?.history) setHistory([])
+    }
+    window.addEventListener('app:data-cleared', handler as EventListener)
+    return () => window.removeEventListener('app:data-cleared', handler as EventListener)
+  }, [])
+
   const addToHistory = useCallback((title: string, url: string) => {
     // Don't add empty URLs or chrome:// URLs
     if (!url || url.startsWith('chrome://') || url.startsWith('file://')) return

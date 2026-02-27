@@ -19,6 +19,25 @@ export function useDownloads(): UseDownloadsResult {
     if (!downloadsApi) return
 
     let isMounted = true
+    const refresh = (): void => {
+      void downloadsApi
+        .getAll?.()
+        .then((existing) => {
+          if (!isMounted) return
+          if (Array.isArray(existing)) setDownloads(existing)
+        })
+        .catch(() => {
+          // ignore
+        })
+    }
+
+    const clearHandler = (e: Event): void => {
+      const detail = (e as CustomEvent).detail as Record<string, unknown> | undefined
+      if (detail?.downloads) refresh()
+    }
+
+    window.addEventListener('app:data-cleared', clearHandler as EventListener)
+
     void downloadsApi
       .getAll?.()
       .then((existing) => {
@@ -61,6 +80,7 @@ export function useDownloads(): UseDownloadsResult {
 
     return () => {
       isMounted = false
+      window.removeEventListener('app:data-cleared', clearHandler as EventListener)
       cleanupStarted()
       cleanupProgress()
       cleanupCompleted()

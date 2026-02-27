@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, shell, screen, Menu, clipboard } from 'electron'
+import { app, BrowserWindow, ipcMain, shell, screen, Menu, clipboard, session } from 'electron'
 import path from 'path'
 import { fileURLToPath } from 'url'
 
@@ -63,6 +63,17 @@ const downloadManager = createDownloadManager({
     return settings?.downloadPath
   }
 })
+const knownSessionPartitions = new Set<string>()
+let privacyHandlersRegistered = false
+
+function registerSession(sess: Electron.Session): void {
+  try {
+    const partition = (sess as unknown as { getPartition?: () => string }).getPartition?.()
+    if (typeof partition === 'string') knownSessionPartitions.add(partition)
+  } catch {
+    // ignore
+  }
+}
 
 function createWindow(): BrowserWindow {
   const savedState = store.store as WindowState
@@ -151,10 +162,12 @@ function createWindow(): BrowserWindow {
   setupWindowControls(mainWindow)
   setupStorageAPI()
   setupSettingsAPI()
+  setupPrivacyAPI()
   setupExternalLinks(mainWindow)
 
   // Set up download handling for the default session of this window
   downloadManager.ensureDownloadHandlingForSession(mainWindow.webContents.session)
+  registerSession(mainWindow.webContents.session)
 
   if (process.env.VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL)
@@ -528,6 +541,64 @@ function setupExternalLinks(window: BrowserWindow): void {
   })
 }
 
+function setupPrivacyAPI(): void {
+  if (privacyHandlersRegistered) return
+  privacyHandlersRegistered = true
+  ipcMain.handle(
+    'privacy:clear-data',
+    async (
+      _event,
+      options: {
+        cookies?: boolean
+        cache?: boolean
+        siteData?: boolean
+      }
+    ) => {
+      try {
+        const partitions = new Set<string>(knownSessionPartitions)
+        partitions.add('') // default session partition key
+
+        const tasks: Promise<unknown>[] = []
+
+        for (const partition of partitions) {
+          const sess = partition === '' ? session.defaultSession : session.fromPartition(partition)
+          if (!sess) continue
+
+          if (options?.cache) {
+            tasks.push(sess.clearCache())
+          }
+
+          if (options?.cookies) {
+            tasks.push(sess.clearStorageData({ storages: ['cookies'] }))
+            tasks.push(sess.clearAuthCache())
+          }
+
+          if (options?.siteData) {
+            tasks.push(
+              sess.clearStorageData({
+                storages: [
+                  'localstorage',
+                  'indexdb',
+                  'serviceworkers',
+                  'cachestorage',
+                  'websql',
+                  'filesystem'
+                ]
+              })
+            )
+          }
+        }
+
+        await Promise.all(tasks)
+        return { success: true }
+      } catch (err) {
+        console.error('Privacy clear-data error:', err)
+        return { success: false, error: String(err) }
+      }
+    }
+  )
+}
+
 app.whenReady().then(() => {
   downloadManager.setupDownloadIPCHandlers()
   createWindow()
@@ -545,6 +616,7 @@ app.on('web-contents-created', (_event, contents) => {
   // Set up download handling for this specific session
   // This catches webviews and other guest contents
   downloadManager.ensureDownloadHandlingForSession(contents.session)
+  registerSession(contents.session)
 
   if (contents.getType() === 'webview') {
     // Get the host window for this webview

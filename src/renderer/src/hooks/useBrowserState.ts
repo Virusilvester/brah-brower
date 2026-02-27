@@ -1,7 +1,8 @@
 import { useState, useCallback, useEffect } from 'react'
 import type { Tab } from '../App'
+import { INTERNAL_HOME_URL } from '../utils/internalPages'
 
-const HOME_URL = 'https://www.google.com'
+const HOME_URL = INTERNAL_HOME_URL
 
 export interface UseBrowserStateResult {
   tabs: Tab[]
@@ -23,7 +24,12 @@ export function useBrowserState(): UseBrowserStateResult {
         const parsed = JSON.parse(saved)
         return parsed.map((t: Tab) => ({
           ...t,
-          url: t.url || HOME_URL
+          url:
+            !t.url ||
+            t.url === 'https://www.google.com' ||
+            (typeof t.url === 'string' && t.url.startsWith('data:text/html'))
+              ? HOME_URL
+              : t.url
         }))
       } catch {
         return [{ id: crypto.randomUUID(), title: 'New Tab', url: HOME_URL }]
