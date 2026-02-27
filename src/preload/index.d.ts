@@ -31,9 +31,13 @@ export interface WindowControlsAPI {
 }
 
 export interface DownloadsAPI {
+  getAll: () => Promise<DownloadItem[]>
   onStarted: (callback: (data: DownloadItem) => void) => () => void
   onProgress: (callback: (data: DownloadItem) => void) => () => void
   onCompleted: (callback: (data: DownloadItem) => void) => () => void
+  clearCompleted: () => Promise<DownloadItem[]>
+  remove: (id: string) => Promise<{ success: boolean; error?: string }>
+  delete: (id: string, filePath: string) => Promise<{ success: boolean; error?: string }>
   openFile: (filePath: string) => Promise<void>
   showInFolder: (filePath: string) => Promise<void>
   pause: (id: string) => Promise<{ success: boolean; error?: string }>

@@ -55,7 +55,14 @@ const store = new Store<WindowState & { downloads: DownloadItemData[]; settings:
 })
 
 const windows = new Set<BrowserWindow>()
-const downloadManager = createDownloadManager()
+const downloadManager = createDownloadManager({
+  getAll: () => store.get('downloads') ?? [],
+  setAll: (downloads) => store.set('downloads', downloads),
+  getDefaultDirectory: () => {
+    const settings = store.get('settings')
+    return settings?.downloadPath
+  }
+})
 
 function createWindow(): BrowserWindow {
   const savedState = store.store as WindowState
@@ -569,8 +576,31 @@ app.on('web-contents-created', (_event, contents) => {
       if (isDirectFile) {
         event.preventDefault()
         console.log(`Intercepted direct file download: ${url}`)
-        // Trigger download through the session
-        contents.downloadURL(url)
+        // Some direct-file clicks already trigger Chromium's download pipeline (will-download).
+        // In those cases, calling downloadURL() here creates a duplicate download + duplicate Save dialog.
+        // Delay downloadURL() briefly and cancel it if a matching will-download is observed.
+        const session = contents.session
+        const cancelIfWillDownloadMatches = (
+          _e: Electron.Event,
+          item: Electron.DownloadItem
+        ): void => {
+          try {
+            const chain = item.getURLChain?.() ?? []
+            const itemUrl = item.getURL?.()
+            const matches = itemUrl === url || chain.includes(url)
+            if (!matches) return
+            clearTimeout(timer)
+          } finally {
+            session.removeListener('will-download', cancelIfWillDownloadMatches)
+          }
+        }
+
+        const timer = setTimeout(() => {
+          session.removeListener('will-download', cancelIfWillDownloadMatches)
+          contents.downloadURL(url)
+        }, 500) // Increased from 250ms to 500ms for reliability
+
+        session.on('will-download', cancelIfWillDownloadMatches)
       }
     })
 

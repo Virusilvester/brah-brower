@@ -46,8 +46,15 @@ function App(): JSX.Element {
 
   const { bookmarks, removeBookmark, isBookmarked, toggleBookmark } = useBookmarks()
 
-  const { downloads, clearCompletedDownloads, pauseDownload, resumeDownload, cancelDownload } =
-    useDownloads()
+  const {
+    downloads,
+    clearCompletedDownloads,
+    pauseDownload,
+    resumeDownload,
+    removeDownload,
+    deleteDownload,
+    cancelDownload
+  } = useDownloads()
 
   const activeTab = tabs.find((t) => t.id === activeTabId) || tabs[0]
 
@@ -198,6 +205,8 @@ function App(): JSX.Element {
                 onPause={pauseDownload}
                 onResume={resumeDownload}
                 onCancel={cancelDownload}
+                onRemove={removeDownload}
+                onDelete={deleteDownload}
                 onClose={() => setActivePanel(null)}
               />
             )}

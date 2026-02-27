@@ -6,7 +6,17 @@ interface SettingsPanelProps {
 }
 
 export function SettingsPanel({ onClose }: SettingsPanelProps): JSX.Element {
-  const [settings, setSettings] = useState({
+  type SettingsState = {
+    theme: 'dark' | 'light'
+    searchEngine: string
+    homepage: string
+    enableAdBlock: boolean
+    enableNotifications: boolean
+    spellcheck: boolean
+    downloadPath: string
+  }
+
+  const [settings, setSettings] = useState<SettingsState>({
     theme: 'dark' as 'dark' | 'light',
     searchEngine: 'google',
     homepage: 'https://www.google.com',
@@ -26,14 +36,14 @@ export function SettingsPanel({ onClose }: SettingsPanelProps): JSX.Element {
         if (saved) {
           setSettings((prev) => ({ ...prev, ...saved }))
           // Apply theme immediately
-          applyTheme(saved.theme)
+          applyTheme(saved.theme ?? 'dark')
         } else {
           // Fallback to localStorage
           const local = localStorage.getItem('brah-settings')
           if (local) {
             const parsed = JSON.parse(local)
             setSettings((prev) => ({ ...prev, ...parsed }))
-            applyTheme(parsed.theme)
+            applyTheme(parsed.theme ?? 'dark')
           }
         }
       } catch (error) {
@@ -47,7 +57,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps): JSX.Element {
     // Listen for settings changes from other windows
     const cleanup = window.settings?.onChange((newSettings) => {
       setSettings((prev) => ({ ...prev, ...newSettings }))
-      applyTheme(newSettings.theme)
+      applyTheme(newSettings.theme ?? 'dark')
     })
 
     return () => {
@@ -93,18 +103,13 @@ export function SettingsPanel({ onClose }: SettingsPanelProps): JSX.Element {
       try {
         const defaults = await window.settings?.reset()
         if (defaults) {
-          setSettings(defaults)
-          applyTheme(defaults.theme)
+          setSettings((prev) => ({ ...prev, ...defaults }))
+          applyTheme(defaults.theme ?? 'dark')
         }
       } catch (error) {
         console.error('Failed to reset settings:', error)
       }
     }
-  }
-
-  const selectDownloadPath = async (): Promise<void> => {
-    // This would need a file dialog API exposed to renderer
-    // For now, we'll just use a text input
   }
 
   if (isLoading) {

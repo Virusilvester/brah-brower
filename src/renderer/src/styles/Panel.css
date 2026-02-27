@@ -271,6 +271,7 @@
 .download-actions {
   display: flex;
   gap: 8px;
+  align-items: center;
 }
 
 .download-actions button {
@@ -285,6 +286,34 @@
 
 .download-actions button:hover {
   background: var(--bg-hover);
+}
+
+.icon-btn {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.icon-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Downloads: always show the X button (history uses hover-only) */
+.download-actions .remove-btn {
+  opacity: 1;
+}
+
+.icon-btn.danger {
+  color: var(--danger);
+}
+
+.icon-btn.danger:hover {
+  background: var(--danger);
+  color: white;
 }
 
 /* Settings specific */

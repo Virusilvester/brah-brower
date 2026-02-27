@@ -51,9 +51,13 @@ export interface DownloadItem {
 }
 
 export interface DownloadsAPI {
+  getAll: () => Promise<DownloadItem[]>
   onStarted: (callback: (data: DownloadItem) => void) => () => void
   onProgress: (callback: (data: DownloadItem) => void) => () => void
   onCompleted: (callback: (data: DownloadItem) => void) => () => void
+  clearCompleted: () => Promise<DownloadItem[]>
+  remove: (id: string) => Promise<{ success: boolean; error?: string }>
+  delete: (id: string, filePath: string) => Promise<{ success: boolean; error?: string }>
   openFile: (filePath: string) => Promise<void>
   showInFolder: (filePath: string) => Promise<void>
   pause: (id: string) => Promise<{ success: boolean; error?: string }>
@@ -92,6 +96,7 @@ contextBridge.exposeInMainWorld('windowControls', {
 
 // Downloads API
 contextBridge.exposeInMainWorld('downloads', {
+  getAll: () => ipcRenderer.invoke('downloads:get-all'),
   onStarted: (callback: (data: DownloadItem) => void) => {
     const handler = (_event: IpcRendererEvent, data: DownloadItem): void => callback(data)
     ipcRenderer.on('download:started', handler)
@@ -107,6 +112,9 @@ contextBridge.exposeInMainWorld('downloads', {
     ipcRenderer.on('download:completed', handler)
     return () => ipcRenderer.removeListener('download:completed', handler)
   },
+  clearCompleted: () => ipcRenderer.invoke('downloads:clear-completed'),
+  remove: (id: string) => ipcRenderer.invoke('downloads:remove', id),
+  delete: (id: string, filePath: string) => ipcRenderer.invoke('downloads:delete', id, filePath),
   openFile: (filePath: string) => ipcRenderer.invoke('download:open', filePath),
   showInFolder: (filePath: string) => ipcRenderer.invoke('download:show-in-folder', filePath),
   pause: (id: string) => ipcRenderer.invoke('download:pause', id),
