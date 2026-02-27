@@ -57,6 +57,18 @@ function App(): JSX.Element {
   } = useDownloads()
 
   const activeTab = tabs.find((t) => t.id === activeTabId) || tabs[0]
+  const activeDownloads = downloads.filter((d) => d.state === 'progressing')
+  const isDownloading = activeDownloads.length > 0
+  const downloadProgress = (() => {
+    if (!isDownloading) return null
+    const known = activeDownloads.filter((d) => d.totalBytes > 0)
+    if (known.length === 0) return null
+    const total = known.reduce((sum, d) => sum + d.totalBytes, 0)
+    const received = known.reduce((sum, d) => sum + d.receivedBytes, 0)
+    if (total <= 0) return null
+    const pct = Math.round((received / total) * 100)
+    return Math.max(0, Math.min(100, pct))
+  })()
 
   useEffect(() => {
     const cleanup = window.windowControls?.onMaximizedChange?.(setIsMaximized)
@@ -141,6 +153,8 @@ function App(): JSX.Element {
         canGoForward={activeTab?.canGoForward}
         isLoading={activeTab?.isLoading}
         isBookmarked={isBookmarked(activeTab?.url || '')}
+        isDownloading={isDownloading}
+        downloadProgress={downloadProgress}
         onBack={handleGoBack}
         onForward={handleGoForward}
         onReload={handleReload}

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, shell, dialog } from 'electron'
+import { app, BrowserWindow, ipcMain, shell } from 'electron'
 import fs from 'fs'
 import path from 'path'
 import crypto from 'crypto'
@@ -74,8 +74,6 @@ export interface DownloadManager {
 export function createDownloadManager(persistence?: DownloadPersistenceAdapter): DownloadManager {
   const activeDownloads = new Map<string, { item: Electron.DownloadItem; data: DownloadItemData }>()
   const handledDownloadItems = new WeakSet<Electron.DownloadItem>()
-  // CRITICAL: Use URL-level deduplication that persists through the save dialog
-  const pendingSaveDialogsByUrl = new Map<string, number>()
   const recentDownloadsBySource = new Map<string, number>()
   const activeDownloadUrls = new Set<string>()
   const persistThrottle = new Map<string, { lastAt: number; lastProgress: number }>()
@@ -128,10 +126,39 @@ export function createDownloadManager(persistence?: DownloadPersistenceAdapter):
 
   const getDefaultDownloadDirectory = (): string => {
     const fromSettings = persistence?.getDefaultDirectory?.()
-    if (fromSettings && typeof fromSettings === 'string' && path.isAbsolute(fromSettings)) {
-      return fromSettings
+    if (fromSettings && typeof fromSettings === 'string') {
+      const trimmed = fromSettings.trim()
+      if (trimmed.length === 0) return app.getPath('downloads')
+      if (trimmed.toLowerCase() === 'downloads') return app.getPath('downloads')
+      if (trimmed === '~') return app.getPath('home')
+      if (trimmed.startsWith('~/')) return path.join(app.getPath('home'), trimmed.slice(2))
+      if (path.isAbsolute(trimmed)) return trimmed
     }
     return app.getPath('downloads')
+  }
+
+  const ensureDirectory = (dir: string): void => {
+    try {
+      fs.mkdirSync(dir, { recursive: true })
+    } catch (err) {
+      console.error('Failed to create download directory:', err)
+    }
+  }
+
+  const getUniqueSavePath = (dir: string, fileName: string): string => {
+    const safeName = path.basename(fileName || 'download')
+    const ext = path.extname(safeName)
+    const base = ext ? safeName.slice(0, -ext.length) : safeName
+
+    let candidate = path.join(dir, safeName)
+    if (!fs.existsSync(candidate)) return candidate
+
+    for (let i = 1; i < 10_000; i++) {
+      candidate = path.join(dir, `${base} (${i})${ext}`)
+      if (!fs.existsSync(candidate)) return candidate
+    }
+
+    return path.join(dir, `${base} (${Date.now()})${ext}`)
   }
 
   const ensureDownloadHandlingForSession = (sessionToHandle: Electron.Session): void => {
@@ -160,86 +187,36 @@ export function createDownloadManager(persistence?: DownloadPersistenceAdapter):
       const fileName = item.getFilename()
       const url = item.getURL()
 
-      // DEDUPLICATION FIX: Check for pending dialogs BEFORE any async operations
       const now = Date.now()
 
-      // Check 1: Is this URL already being processed in a save dialog?
-      const pendingAt = pendingSaveDialogsByUrl.get(url)
-      if (pendingAt && now - pendingAt < 60_000) {
-        console.log(`Save dialog already pending for ${url}, cancelling duplicate download item`)
-        item.cancel()
-        return
-      }
-
-      // Check 2: Was this URL recently downloaded (within last 15 seconds)?
+      // Check 1: Was this URL recently downloaded (within last 15 seconds)?
       const lastAt = recentDownloadsBySource.get(url)
       if (lastAt && now - lastAt < 15_000) {
-        console.log(`Suppressing duplicate download prompt: ${fileName} from ${url}`)
+        console.log(`Suppressing duplicate download: ${fileName} from ${url}`)
         item.cancel()
         return
       }
 
-      // Check 3: Is this URL currently downloading?
+      // Check 2: Is this URL currently downloading?
       if (activeDownloadUrls.has(url)) {
         console.log(`Download already active for ${url}, cancelling duplicate download item`)
         item.cancel()
         return
       }
 
-      // Mark URL as being processed BEFORE showing dialog (prevents race conditions)
-      pendingSaveDialogsByUrl.set(url, now)
       recentDownloadsBySource.set(url, now)
 
       // Cleanup old entries periodically
       for (const [key, ts] of recentDownloadsBySource.entries()) {
         if (now - ts > 30_000) recentDownloadsBySource.delete(key)
       }
-      for (const [key, ts] of pendingSaveDialogsByUrl.entries()) {
-        if (now - ts > 120_000) pendingSaveDialogsByUrl.delete(key)
-      }
 
       console.log(`Starting download: ${fileName} from ${url}`)
 
-      // Pause immediately so the file doesn't start writing to a temp/default location
-      // while the user chooses a save destination.
-      try {
-        item.pause()
-      } catch (err) {
-        console.warn('Failed to pause download item before save dialog:', err)
-      }
-
-      // Show save dialog
-      let filePath: string | undefined
-      let canceled = false
-      try {
-        const result = await dialog.showSaveDialog(ownerWindow, {
-          defaultPath: path.join(getDefaultDownloadDirectory(), fileName),
-          buttonLabel: 'Save',
-          title: 'Save Download',
-          properties: ['createDirectory', 'showOverwriteConfirmation']
-        })
-        filePath = result.filePath ?? undefined
-        canceled = result.canceled
-      } catch (err) {
-        console.error('Save dialog error:', err)
-        canceled = true
-      } finally {
-        // ALWAYS clean up pending dialog tracking
-        pendingSaveDialogsByUrl.delete(url)
-      }
-
-      if (canceled || !filePath) {
-        console.log('Download cancelled by user')
-        item.cancel()
-        return
-      }
-
+      const downloadDir = getDefaultDownloadDirectory()
+      ensureDirectory(downloadDir)
+      const filePath = getUniqueSavePath(downloadDir, fileName)
       item.setSavePath(filePath)
-      try {
-        if (item.isPaused()) item.resume()
-      } catch (err) {
-        console.warn('Failed to resume download item after save dialog:', err)
-      }
 
       const id = crypto.randomUUID()
       const initialDownloadData: DownloadItemData = {

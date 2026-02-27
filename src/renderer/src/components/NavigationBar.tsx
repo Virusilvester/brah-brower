@@ -7,6 +7,8 @@ interface NavigationBarProps {
   canGoForward?: boolean
   isLoading?: boolean
   isBookmarked: boolean
+  isDownloading?: boolean
+  downloadProgress?: number | null
   onBack: () => void
   onForward: () => void
   onReload: () => void
@@ -24,6 +26,8 @@ export function NavigationBar({
   canGoForward,
   isLoading,
   isBookmarked,
+  isDownloading,
+  downloadProgress,
   onBack,
   onForward,
   onReload,
@@ -114,7 +118,18 @@ export function NavigationBar({
           </svg>
         </button>
 
-        <button className="action-btn" onClick={onShowDownloads} title="Downloads">
+        <button
+          className={`action-btn downloads-btn ${isDownloading ? 'downloading' : ''} ${
+            isDownloading && downloadProgress == null ? 'indeterminate' : ''
+          }`}
+          onClick={onShowDownloads}
+          title="Downloads"
+          style={
+            isDownloading && typeof downloadProgress === 'number'
+              ? ({ ['--download-progress' as any]: downloadProgress } as React.CSSProperties)
+              : undefined
+          }
+        >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
             <polyline points="7 10 12 15 17 10" />

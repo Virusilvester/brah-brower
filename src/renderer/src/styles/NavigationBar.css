@@ -94,6 +94,7 @@
   align-items: center;
   justify-content: center;
   transition: all 0.2s;
+  position: relative;
 }
 
 .action-btn:hover {
@@ -108,4 +109,37 @@
 .action-btn svg {
   width: 16px;
   height: 16px;
+  position: relative;
+  z-index: 1;
+}
+
+.downloads-btn.downloading::before {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 7px;
+  background: conic-gradient(
+    var(--accent-primary) calc(var(--download-progress, 0) * 1%),
+    rgba(255, 255, 255, 0.12) 0
+  );
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 0);
+  mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 0);
+  z-index: 0;
+}
+
+.downloads-btn.downloading.indeterminate::before {
+  background: conic-gradient(
+    var(--accent-primary) 0 25%,
+    rgba(255, 255, 255, 0.12) 25% 100%
+  );
+  animation: downloads-ring-spin 1.1s linear infinite;
+}
+
+@keyframes downloads-ring-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
