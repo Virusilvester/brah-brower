@@ -1,6 +1,6 @@
 {
   "name": "brah-browser",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "description": "Brah Browser is a lightweight multi-tab browser",
   "main": "./out/main/index.js",
   "author": "ViruSilvesteR <onesilonecho@gmail.com>",

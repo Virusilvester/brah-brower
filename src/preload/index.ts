@@ -8,23 +8,6 @@ export interface WindowControlsAPI {
   onMaximizedChange: (callback: (isMaximized: boolean) => void) => () => void
 }
 
-export interface ContextMenuParams {
-  x: number
-  y: number
-  linkURL?: string
-  linkText?: string
-  srcURL?: string
-  hasImageContents: boolean
-  isEditable: boolean
-  selectionText: string
-  editFlags: {
-    canCut: boolean
-    canCopy: boolean
-    canPaste: boolean
-    canSelectAll: boolean
-  }
-}
-
 export interface AppSettings {
   theme: 'dark' | 'light'
   searchEngine: string
@@ -35,7 +18,6 @@ export interface AppSettings {
   spellcheck?: boolean
 }
 
-// Type definitions
 export interface DownloadItem {
   id: string
   fileName: string
@@ -83,7 +65,62 @@ export interface BrowserEventsAPI {
   onNewTab: (callback: () => void) => () => void
 }
 
-// Window controls API
+export type PermissionValue = 'allow' | 'block' | 'ask'
+
+export interface SitePermissions {
+  notifications: PermissionValue
+  camera: PermissionValue
+  microphone: PermissionValue
+  geolocation: PermissionValue
+  popups: PermissionValue
+  javascript: PermissionValue
+  cookies: PermissionValue
+  images: PermissionValue
+  adblock: PermissionValue
+}
+
+export interface SiteSettings {
+  origin: string
+  permissions: Partial<SitePermissions>
+  lastVisited?: number
+  title?: string
+  favicon?: string
+}
+
+export interface SiteSettingsAPI {
+  get: (origin: string) => Promise<SiteSettings>
+  setPermission: (
+    origin: string,
+    permission: keyof SitePermissions,
+    value: PermissionValue
+  ) => Promise<{ success: boolean }>
+  reset: (origin: string) => Promise<{ success: boolean }>
+  getAll: () => Promise<SiteSettings[]>
+  getDefaults: () => Promise<SitePermissions>
+}
+
+export interface AdBlockAPI {
+  isEnabled: () => Promise<boolean>
+  setEnabled: (value: boolean) => Promise<void>
+  getBlockedCount: () => Promise<number>
+  resetStats: () => Promise<void>
+  onBlockedCountChange: (callback: (count: number) => void) => () => void
+}
+
+export interface ClearDataOptions {
+  history?: boolean
+  downloads?: boolean
+  bookmarks?: boolean
+  cookies?: boolean
+  cache?: boolean
+  siteData?: boolean
+}
+
+export interface PrivacyAPI {
+  clearData: (options: ClearDataOptions) => Promise<{ success: boolean; error?: string }>
+}
+
+// ── Window Controls ──────────────────────────────────────────────
 contextBridge.exposeInMainWorld('windowControls', {
   minimize: () => ipcRenderer.invoke('window:minimize'),
   maximize: () => ipcRenderer.invoke('window:maximize'),
@@ -96,7 +133,7 @@ contextBridge.exposeInMainWorld('windowControls', {
   }
 } as WindowControlsAPI)
 
-// Downloads API
+// ── Downloads ────────────────────────────────────────────────────
 contextBridge.exposeInMainWorld('downloads', {
   getAll: () => ipcRenderer.invoke('downloads:get-all'),
   onStarted: (callback: (data: DownloadItem) => void) => {
@@ -125,13 +162,13 @@ contextBridge.exposeInMainWorld('downloads', {
   cancel: (id: string) => ipcRenderer.invoke('download:cancel', id)
 } as DownloadsAPI)
 
-// Storage API
+// ── Storage ──────────────────────────────────────────────────────
 contextBridge.exposeInMainWorld('storage', {
   get: <T>(key: string) => ipcRenderer.invoke('storage:get', key) as Promise<T | null>,
   set: <T>(key: string, value: T) => ipcRenderer.invoke('storage:set', key, value)
 } as StorageAPI)
 
-// NEW: Settings API
+// ── Settings ─────────────────────────────────────────────────────
 contextBridge.exposeInMainWorld('settings', {
   get: () => ipcRenderer.invoke('settings:get'),
   set: (newSettings: Partial<AppSettings>) => ipcRenderer.invoke('settings:set', newSettings),
@@ -143,12 +180,35 @@ contextBridge.exposeInMainWorld('settings', {
   }
 } as SettingsAPI)
 
-// Privacy API
+// ── Privacy ──────────────────────────────────────────────────────
 contextBridge.exposeInMainWorld('privacy', {
-  clearData: (options: any) => ipcRenderer.invoke('privacy:clear-data', options)
-} as any)
+  clearData: (options: ClearDataOptions) => ipcRenderer.invoke('privacy:clear-data', options)
+} as PrivacyAPI)
 
-// Browser events API
+// ── Site Settings ─────────────────────────────────────────────────
+contextBridge.exposeInMainWorld('siteSettings', {
+  get: (origin: string) => ipcRenderer.invoke('site-settings:get', origin),
+  setPermission: (origin: string, permission: string, value: PermissionValue) =>
+    ipcRenderer.invoke('site-settings:set-permission', origin, permission, value),
+  reset: (origin: string) => ipcRenderer.invoke('site-settings:reset', origin),
+  getAll: () => ipcRenderer.invoke('site-settings:get-all'),
+  getDefaults: () => ipcRenderer.invoke('site-settings:get-defaults')
+} as SiteSettingsAPI)
+
+// ── Ad Block ─────────────────────────────────────────────────────
+contextBridge.exposeInMainWorld('adBlock', {
+  isEnabled: () => ipcRenderer.invoke('adblock:is-enabled'),
+  setEnabled: (value: boolean) => ipcRenderer.invoke('adblock:set-enabled', value),
+  getBlockedCount: () => ipcRenderer.invoke('adblock:get-count'),
+  resetStats: () => ipcRenderer.invoke('adblock:reset-stats'),
+  onBlockedCountChange: (callback: (count: number) => void) => {
+    const handler = (_event: IpcRendererEvent, count: number): void => callback(count)
+    ipcRenderer.on('adblock:count-updated', handler)
+    return () => ipcRenderer.removeListener('adblock:count-updated', handler)
+  }
+} as AdBlockAPI)
+
+// ── Browser Events ────────────────────────────────────────────────
 contextBridge.exposeInMainWorld('browserEvents', {
   onWebviewNewTab: (callback: (url: string) => void) => {
     const handler = (_event: IpcRendererEvent, url: string): void => callback(url)
@@ -162,15 +222,7 @@ contextBridge.exposeInMainWorld('browserEvents', {
   }
 } as BrowserEventsAPI)
 
-// Webview API for navigation controls
-contextBridge.exposeInMainWorld('webviewControls', {
-  // These will be called from renderer to control webview
-  executeJavaScript: (_webviewId: string, _code: string) => {
-    // This is handled in renderer via ref
-  }
-})
-
-// Dispatch custom event for webview-new-tab (for backwards compatibility)
+// Dispatch custom event for webview-new-tab
 ipcRenderer.on('webview-new-tab', (_event: IpcRendererEvent, url: string) => {
   window.dispatchEvent(new CustomEvent('webview-new-tab', { detail: url }))
 })

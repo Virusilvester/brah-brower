@@ -30,10 +30,9 @@ export function TitleBar({
             <line x1="4.93" y1="4.93" x2="9.17" y2="9.17" />
             <line x1="14.83" y1="14.83" x2="19.07" y2="19.07" />
             <line x1="14.83" y1="9.17" x2="19.07" y2="4.93" />
-            <line x1="14.83" y1="9.17" x2="18.36" y2="5.64" />
             <line x1="4.93" y1="19.07" x2="9.17" y2="14.83" />
           </svg>
-          <span>Brah Browser</span>
+          <span>Brah</span>
         </div>
       </div>
 
@@ -43,7 +42,6 @@ export function TitleBar({
             <line x1="5" y1="12" x2="19" y2="12" />
           </svg>
         </button>
-
         <button
           className="window-btn maximize"
           onClick={onMaximize}
@@ -59,7 +57,6 @@ export function TitleBar({
             </svg>
           )}
         </button>
-
         <button className="window-btn close" onClick={onClose} title="Close">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <line x1="18" y1="6" x2="6" y2="18" />

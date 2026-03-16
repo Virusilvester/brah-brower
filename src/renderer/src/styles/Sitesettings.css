@@ -1,0 +1,276 @@
+/* ─── Site Settings Panel ────────────────────────────────────────── */
+.site-settings-panel .panel-content {
+  padding: 0 0 24px;
+}
+
+/* ─── Site Identity ──────────────────────────────────────────────── */
+.site-identity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  position: relative;
+}
+
+.site-identity-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.site-identity-icon img {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+}
+
+.site-identity-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.site-domain {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: 0.02em;
+}
+
+.site-origin {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 1px;
+}
+
+.save-flash {
+  position: absolute;
+  right: 16px;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--success);
+  animation: flashIn 0.8s both;
+}
+
+@keyframes flashIn {
+  0%   { opacity: 0; transform: translateY(4px); }
+  20%  { opacity: 1; transform: translateY(0); }
+  80%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* ─── Permissions Section ────────────────────────────────────────── */
+.permissions-section {
+  padding: 4px 0 8px;
+}
+
+.permissions-label {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-tertiary);
+  padding: 12px 16px 6px;
+}
+
+/* ─── Permission Row ─────────────────────────────────────────────── */
+.permission-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  transition: background var(--transition);
+  border-radius: 0;
+}
+
+.permission-row:hover {
+  background: var(--bg-hover);
+}
+
+.permission-row.customized {
+  background: rgba(232, 160, 32, 0.04);
+}
+
+.permission-row.customized:hover {
+  background: rgba(232, 160, 32, 0.08);
+}
+
+.permission-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--text-tertiary);
+}
+
+.permission-icon svg {
+  width: 13px;
+  height: 13px;
+}
+
+.permission-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.permission-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.permission-desc {
+  font-size: 10px;
+  color: var(--text-tertiary);
+  margin-top: 1px;
+}
+
+.custom-badge {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--accent-dim);
+  padding: 1px 5px;
+  border-radius: 3px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* ─── Permission Select ──────────────────────────────────────────── */
+.permission-control {
+  flex-shrink: 0;
+}
+
+.perm-select {
+  height: 26px;
+  padding: 0 22px 0 8px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-md);
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  outline: none;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%238a8790' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 6px center;
+  transition: border-color var(--transition);
+  min-width: 72px;
+}
+
+.perm-select:focus {
+  border-color: var(--accent);
+}
+
+.perm-select.perm-allow {
+  border-color: rgba(82,201,126,0.4);
+  background-color: rgba(82,201,126,0.06);
+}
+
+.perm-select.perm-block {
+  border-color: rgba(224,82,82,0.4);
+  background-color: rgba(224,82,82,0.06);
+}
+
+.perm-select.perm-ask {
+  border-color: rgba(232,160,32,0.4);
+  background-color: rgba(232,160,32,0.06);
+}
+
+/* Options styling */
+.perm-select option {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+/* ─── Site Info / Connection ─────────────────────────────────────── */
+.site-info-section {
+  padding: 8px 0;
+  border-top: 1px solid var(--border-subtle);
+  margin-top: 8px;
+}
+
+.connection-info {
+  padding: 4px 16px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.connection-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.conn-label {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+.conn-value {
+  font-size: 11px;
+  color: var(--text-secondary);
+  text-align: right;
+}
+
+.conn-value.secure { color: var(--success); }
+.conn-value.insecure { color: var(--warning); }
+.conn-value.mono { font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary); }
+
+/* ─── Footer ─────────────────────────────────────────────────────── */
+.site-settings-footer {
+  padding: 8px 16px 4px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.reset-site-btn {
+  height: 28px;
+  padding: 0 12px;
+  background: transparent;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+  transition: background var(--transition), color var(--transition), border-color var(--transition);
+}
+
+.reset-site-btn:hover {
+  background: var(--danger-dim);
+  border-color: var(--danger);
+  color: var(--danger);
+}

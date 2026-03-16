@@ -5,6 +5,10 @@ import { fileURLToPath } from 'url'
 import StoreImport from 'electron-store'
 import { createDownloadManager, type DownloadItemData } from './downloads'
 
+import { adBlockManager } from './adblock'
+import { siteSettingsManager } from './siteSettings'
+import { setupAdBlockIPC, loadAdBlockState } from './adblock-ipc'
+
 // electron-store v11+ is ESM; when bundled to CJS (electron-vite), `require('electron-store')`
 // can return `{ default: Store }`. Keep a runtime-safe interop here.
 const Store = (StoreImport as unknown as { default?: typeof StoreImport }).default ?? StoreImport
@@ -170,6 +174,12 @@ function createWindow(): BrowserWindow {
   // Set up download handling for the default session of this window
   downloadManager.ensureDownloadHandlingForSession(mainWindow.webContents.session)
   registerSession(mainWindow.webContents.session)
+
+  // Set up adblock for this session
+  adBlockManager.attachToSession(mainWindow.webContents.session)
+
+  // Set up site settings permission handlers for this session
+  siteSettingsManager.setupPermissionHandlers(mainWindow.webContents.session)
 
   if (process.env.VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL)
@@ -614,9 +624,22 @@ function setupPrivacyAPI(): void {
   )
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   downloadManager.setupDownloadIPCHandlers()
-  createWindow()
+
+  // Initialize adblock
+  await adBlockManager.initialize()
+
+  // Load persisted adblock state
+  loadAdBlockState()
+
+  // Setup IPC handlers for adblock (this sends stats to renderer)
+  const mainWindow = createWindow()
+  setupAdBlockIPC(mainWindow)
+
+  // Setup site settings IPC
+  siteSettingsManager.setupIPC()
+
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
@@ -632,6 +655,12 @@ app.on('web-contents-created', (_event, contents) => {
   // This catches webviews and other guest contents
   downloadManager.ensureDownloadHandlingForSession(contents.session)
   registerSession(contents.session)
+
+  // Set up adblock for webview sessions
+  adBlockManager.attachToSession(contents.session)
+
+  // Set up site settings permission handlers for webview sessions
+  siteSettingsManager.setupPermissionHandlers(contents.session)
 
   if (contents.getType() === 'webview') {
     // Get the host window for this webview

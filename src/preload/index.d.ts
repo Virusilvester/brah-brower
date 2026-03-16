@@ -22,6 +22,48 @@ export interface AppSettings {
   spellcheck?: boolean
 }
 
+export type PermissionValue = 'allow' | 'block' | 'ask'
+
+export interface SitePermissions {
+  notifications: PermissionValue
+  camera: PermissionValue
+  microphone: PermissionValue
+  geolocation: PermissionValue
+  popups: PermissionValue
+  javascript: PermissionValue
+  cookies: PermissionValue
+  images: PermissionValue
+  adblock: PermissionValue
+}
+
+export interface SiteSettings {
+  origin: string
+  permissions: Partial<SitePermissions>
+  lastVisited?: number
+  title?: string
+  favicon?: string
+}
+
+export interface SiteSettingsAPI {
+  get: (origin: string) => Promise<SiteSettings>
+  setPermission: (
+    origin: string,
+    permission: keyof SitePermissions,
+    value: PermissionValue
+  ) => Promise<{ success: boolean }>
+  reset: (origin: string) => Promise<{ success: boolean }>
+  getAll: () => Promise<SiteSettings[]>
+  getDefaults: () => Promise<SitePermissions>
+}
+
+export interface AdBlockAPI {
+  isEnabled: () => Promise<boolean>
+  setEnabled: (value: boolean) => Promise<void>
+  getBlockedCount: () => Promise<number>
+  resetStats: () => Promise<void>
+  onBlockedCountChange: (callback: (count: number) => void) => () => void
+}
+
 export interface WindowControlsAPI {
   minimize: () => Promise<void>
   maximize: () => Promise<void>
@@ -84,6 +126,8 @@ declare global {
     settings: SettingsAPI
     browserEvents: BrowserEventsAPI
     privacy: PrivacyAPI
+    siteSettings: SiteSettingsAPI
+    adBlock: AdBlockAPI
   }
 }
 

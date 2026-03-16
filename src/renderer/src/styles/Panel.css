@@ -1,118 +1,335 @@
+/* ─── Base Panel ─────────────────────────────────────────────────── */
 .panel {
-  height: 100%;
   display: flex;
   flex-direction: column;
-  background: var(--bg-secondary);
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg-elevated);
 }
 
+/* ─── Panel Header ───────────────────────────────────────────────── */
 .panel-header {
-  height: 48px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 16px;
-  border-bottom: 1px solid var(--border-color);
+  padding: 16px 16px 0;
+  flex-shrink: 0;
 }
 
 .panel-header h3 {
-  font-size: 14px;
-  font-weight: 600;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
   color: var(--text-primary);
 }
 
 .close-btn {
-  width: 24px;
-  height: 24px;
-  border: none;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-md);
   background: transparent;
-  color: var(--text-secondary);
+  border: none;
   cursor: pointer;
-  border-radius: 4px;
+  color: var(--text-tertiary);
   font-size: 18px;
   line-height: 1;
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: background var(--transition), color var(--transition);
 }
 
 .close-btn:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
+  background: var(--danger-dim);
+  color: var(--danger);
 }
 
+/* ─── Panel Search ───────────────────────────────────────────────── */
 .panel-search {
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--border-color);
+  padding: 12px 16px 0;
+  flex-shrink: 0;
 }
 
 .panel-search input {
   width: 100%;
-  height: 32px;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
+  height: 34px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
   padding: 0 12px;
+  font-family: var(--font-mono);
+  font-size: 12px;
   color: var(--text-primary);
-  font-size: 13px;
-}
-
-.panel-search input:focus {
   outline: none;
-  border-color: var(--accent-primary);
+  transition: border-color var(--transition), box-shadow var(--transition);
 }
 
-.panel-actions {
-  padding: 8px 16px;
-  border-bottom: 1px solid var(--border-color);
-}
-
-.clear-btn {
-  padding: 6px 12px;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-color);
-  color: var(--text-primary);
-  border-radius: 4px;
-  cursor: pointer;
+.panel-search input::placeholder {
+  font-family: var(--font-body);
+  color: var(--text-tertiary);
   font-size: 12px;
 }
 
-.clear-btn:hover {
-  background: var(--bg-hover);
+.panel-search input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-dim);
 }
 
+/* ─── Panel Actions ──────────────────────────────────────────────── */
+.panel-actions {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* ─── Panel Content ──────────────────────────────────────────────── */
 .panel-content {
   flex: 1;
   overflow-y: auto;
   padding: 8px 0;
 }
 
+/* ─── Empty State ────────────────────────────────────────────────── */
 .empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
   text-align: center;
-  color: var(--text-secondary);
-  padding: 40px 20px;
-  font-size: 13px;
+  gap: 8px;
 }
 
-/* History specific */
+.empty-icon {
+  font-size: 32px;
+  opacity: 0.4;
+  margin-bottom: 4px;
+}
+
+.empty-state p {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  letter-spacing: 0.04em;
+}
+
+.empty-state small {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  line-height: 1.5;
+  max-width: 200px;
+}
+
+/* ─── Buttons ────────────────────────────────────────────────────── */
+.clear-btn,
+.save-btn,
+.reset-btn {
+  height: 28px;
+  padding: 0 12px;
+  border-radius: var(--radius-md);
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  transition: background var(--transition), color var(--transition), transform 80ms;
+}
+
+.clear-btn:active,
+.save-btn:active,
+.reset-btn:active {
+  transform: scale(0.97);
+}
+
+.clear-btn {
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+}
+
+.clear-btn:hover {
+  background: var(--danger-dim);
+  color: var(--danger);
+}
+
+.save-btn {
+  background: var(--accent);
+  color: #0d0d0f;
+}
+
+.save-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 85%, white);
+  box-shadow: var(--shadow-accent);
+}
+
+.save-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.reset-btn {
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+}
+
+.reset-btn:hover {
+  background: var(--bg-active);
+  color: var(--text-primary);
+}
+
+/* Icon buttons */
+.icon-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--text-tertiary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--transition), color var(--transition);
+  flex-shrink: 0;
+}
+
+.icon-btn svg {
+  width: 13px;
+  height: 13px;
+  pointer-events: none;
+}
+
+.icon-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+}
+
+.icon-btn.danger:hover {
+  background: var(--danger-dim);
+  color: var(--danger);
+}
+
+.icon-btn.remove-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+/* ─── Bookmarks Panel ────────────────────────────────────────────── */
+.bookmark-item {
+  display: flex;
+  align-items: center;
+  padding: 2px 8px 2px 16px;
+  gap: 4px;
+  border-radius: 0;
+  transition: background var(--transition);
+}
+
+.bookmark-item:hover {
+  background: var(--bg-hover);
+}
+
+.bookmark-content {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  cursor: pointer;
+  padding: 7px 0;
+  min-width: 0;
+}
+
+.bookmark-favicon {
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.bookmark-favicon-default {
+  font-size: 12px;
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.bookmark-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 1px;
+}
+
+.bookmark-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bookmark-url {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bookmark-item .remove-btn {
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: transparent;
+  font-size: 16px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background var(--transition), color var(--transition);
+}
+
+.bookmark-item:hover .remove-btn {
+  color: var(--text-tertiary);
+}
+
+.bookmark-item .remove-btn:hover {
+  background: var(--danger-dim);
+  color: var(--danger) !important;
+}
+
+/* ─── History Panel ──────────────────────────────────────────────── */
 .history-group {
-  margin-bottom: 16px;
+  margin-bottom: 4px;
 }
 
 .history-date {
-  padding: 8px 16px;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  color: var(--text-tertiary);
+  padding: 10px 16px 4px;
 }
 
 .history-item {
   display: flex;
   align-items: center;
-  padding: 8px 16px;
-  cursor: pointer;
-  transition: background 0.2s;
+  padding: 2px 8px 2px 16px;
+  gap: 4px;
+  transition: background var(--transition);
 }
 
 .history-item:hover {
@@ -122,20 +339,24 @@
 .history-item-content {
   flex: 1;
   min-width: 0;
+  cursor: pointer;
+  padding: 6px 0;
 }
 
 .history-title {
-  font-size: 13px;
+  font-size: 12px;
+  font-weight: 500;
   color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  margin-bottom: 2px;
+  margin-bottom: 1px;
 }
 
 .history-url {
-  font-size: 11px;
-  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-tertiary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -143,120 +364,86 @@
 
 .history-time {
   font-size: 10px;
-  color: var(--text-secondary);
-  margin-top: 2px;
+  color: var(--text-tertiary);
+  margin-top: 1px;
 }
 
-.remove-btn {
-  width: 20px;
-  height: 20px;
-  border: none;
+.history-item .remove-btn {
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--text-secondary);
+  border: none;
   cursor: pointer;
-  border-radius: 3px;
-  opacity: 0;
-  transition: all 0.2s;
+  color: transparent;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background var(--transition), color var(--transition);
 }
 
 .history-item:hover .remove-btn {
-  opacity: 1;
+  color: var(--text-tertiary);
 }
 
-.remove-btn:hover {
-  background: var(--danger);
-  color: white;
+.history-item .remove-btn:hover {
+  background: var(--danger-dim);
+  color: var(--danger) !important;
 }
 
-/* Bookmarks specific */
-.bookmark-item {
-  display: flex;
-  align-items: center;
+/* ─── Downloads Panel ────────────────────────────────────────────── */
+.download-item {
   padding: 10px 16px;
-  cursor: pointer;
-  transition: background 0.2s;
+  border-bottom: 1px solid var(--border-subtle);
+  transition: background var(--transition);
 }
 
-.bookmark-item:hover {
+.download-item:last-child {
+  border-bottom: none;
+}
+
+.download-item:hover {
   background: var(--bg-hover);
 }
 
-.bookmark-content {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-}
-
-.bookmark-favicon {
-  width: 16px;
-  height: 16px;
-  border-radius: 2px;
-  flex-shrink: 0;
-}
-
-.bookmark-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.bookmark-title {
-  font-size: 13px;
-  color: var(--text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  margin-bottom: 2px;
-}
-
-.bookmark-url {
-  font-size: 11px;
-  color: var(--text-secondary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* Downloads specific */
-.download-item {
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--border-color);
-}
-
 .download-info {
-  margin-bottom: 8px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
 }
 
 .download-filename {
-  font-size: 13px;
+  font-size: 12px;
+  font-weight: 500;
   color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  margin-bottom: 4px;
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
 }
 
 .download-meta {
-  font-size: 11px;
-  color: var(--text-secondary);
+  font-size: 10px;
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
-.download-meta .completed {
-  color: var(--success);
-}
+.download-meta .completed { color: var(--success); }
+.download-meta .cancelled { color: var(--text-tertiary); }
+.download-meta .error { color: var(--danger); }
 
-.download-meta .cancelled {
-  color: var(--text-secondary);
-}
-
-.download-meta .error {
-  color: var(--danger);
-}
-
+/* Progress bar */
 .download-progress {
-  height: 4px;
-  background: var(--bg-tertiary);
+  height: 3px;
+  background: var(--border-subtle);
   border-radius: 2px;
   overflow: hidden;
   margin-bottom: 8px;
@@ -264,198 +451,93 @@
 
 .progress-bar {
   height: 100%;
-  background: var(--accent-primary);
-  transition: width 0.3s;
+  background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 60%, white));
+  border-radius: 2px;
+  transition: width 300ms ease;
+  position: relative;
+  overflow: hidden;
 }
 
-.download-actions {
-  display: flex;
-  gap: 8px;
-  align-items: center;
+.progress-bar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+  animation: shimmer 1.5s infinite;
 }
 
-.download-actions button {
-  padding: 4px 10px;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-color);
-  color: var(--text-primary);
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 11px;
-}
-
-.download-actions button:hover {
-  background: var(--bg-hover);
-}
-
-.icon-btn {
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.icon-btn svg {
-  width: 16px;
-  height: 16px;
-}
-
-/* Downloads: always show the X button (history uses hover-only) */
-.download-actions .remove-btn {
-  opacity: 1;
-}
-
-.icon-btn.danger {
-  color: var(--danger);
-}
-
-.icon-btn.danger:hover {
-  background: var(--danger);
-  color: white;
-}
-
-/* Settings specific */
-.settings-content {
-  padding: 16px;
-}
-
-.setting-item {
-  margin-bottom: 16px;
-}
-
-.setting-item label {
-  display: block;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-secondary);
-  margin-bottom: 6px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.setting-item input,
-.setting-item select {
-  width: 100%;
-  height: 32px;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  padding: 0 12px;
-  color: var(--text-primary);
-  font-size: 13px;
-}
-
-.setting-item input:focus,
-.setting-item select:focus {
-  outline: none;
-  border-color: var(--accent-primary);
-}
-
-.save-btn {
-  width: 100%;
-  padding: 10px;
-  background: var(--accent-primary);
-  border: none;
-  color: white;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 500;
-  margin-top: 8px;
-}
-
-.save-btn:hover {
-  background: var(--accent-hover);
-}
-
-.bookmark-btn {
-  transition: all 0.2s;
-}
-
-.bookmark-btn.active {
-  color: #ffd700; /* Gold color for filled star */
-  filter: drop-shadow(0 0 2px rgba(255, 215, 0, 0.5));
-}
-
-.bookmark-btn:hover {
-  transform: scale(1.1);
-}
-
-.bookmark-favicon-default {
-  width: 16px;
-  height: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  flex-shrink: 0;
-}
-
-.empty-state {
-  text-align: center;
-  padding: 40px 20px;
-  color: var(--text-secondary);
-}
-
-.empty-icon {
-  font-size: 48px;
-  margin-bottom: 16px;
-  opacity: 0.5;
-}
-
-.empty-state p {
-  margin: 0 0 8px 0;
-  font-size: 14px;
-}
-
-.empty-state small {
-  font-size: 12px;
-  opacity: 0.7;
+@keyframes shimmer {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(100%); }
 }
 
 .download-controls {
   display: flex;
-  gap: 8px;
-  margin-bottom: 8px;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.download-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.download-actions button:not(.icon-btn) {
+  height: 24px;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-hover);
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-body);
+  font-size: 11px;
+  color: var(--text-secondary);
+  transition: background var(--transition), color var(--transition);
+}
+
+.download-actions button:not(.icon-btn):hover {
+  background: var(--bg-active);
+  color: var(--text-primary);
 }
 
 .control-btn {
-  padding: 4px 10px;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-color);
-  color: var(--text-primary);
-  border-radius: 4px;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-hover);
+  border: none;
   cursor: pointer;
+  font-family: var(--font-body);
   font-size: 11px;
-  transition: all 0.2s;
+  color: var(--text-secondary);
+  transition: background var(--transition), color var(--transition);
 }
 
 .control-btn:hover:not(:disabled) {
-  background: var(--bg-hover);
-}
-
-.control-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.control-btn.danger {
-  color: var(--danger);
+  background: var(--bg-active);
+  color: var(--text-primary);
 }
 
 .control-btn.danger:hover {
-  background: var(--danger);
-  color: white;
+  background: var(--danger-dim);
+  color: var(--danger);
 }
 
-/* Settings Styles */
+.control-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ─── Settings Panel ─────────────────────────────────────────────── */
+.settings-content {
+  padding: 4px 0 24px;
+}
 
 .settings-section {
-  margin-bottom: 24px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--border-color, #333);
+  padding: 16px 16px 8px;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .settings-section:last-of-type {
@@ -463,12 +545,66 @@
 }
 
 .settings-section h4 {
-  margin: 0 0 12px 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-secondary, #888);
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.12em;
+  color: var(--text-tertiary);
+  margin-bottom: 12px;
+}
+
+.setting-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+}
+
+.setting-item label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  flex: 1;
+  min-width: 0;
+}
+
+.setting-item input[type='text'],
+.setting-item select {
+  height: 30px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-md);
+  padding: 0 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-primary);
+  outline: none;
+  transition: border-color var(--transition), box-shadow var(--transition);
+  min-width: 120px;
+}
+
+.setting-item select {
+  font-family: var(--font-body);
+  font-size: 12px;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238a8790' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  padding-right: 28px;
+}
+
+.setting-item input[type='text']:focus,
+.setting-item select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}
+
+.setting-item.checkbox {
+  justify-content: flex-start;
+  gap: 10px;
 }
 
 .setting-item.checkbox label {
@@ -476,51 +612,79 @@
   align-items: center;
   gap: 8px;
   cursor: pointer;
-  font-weight: 500;
+  font-size: 12px;
+  color: var(--text-secondary);
 }
 
-.setting-item.checkbox input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
+.setting-item.checkbox input[type='checkbox'] {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--accent);
   cursor: pointer;
+  flex-shrink: 0;
 }
 
 .setting-item small {
+  font-size: 10px;
+  color: var(--text-tertiary);
   display: block;
-  margin-top: 4px;
-  color: var(--text-secondary, #888);
-  font-size: 12px;
+  margin-top: 2px;
+  width: 100%;
+  flex-basis: 100%;
+}
+
+/* Settings that have an input below label */
+.setting-item:has(small) {
+  flex-wrap: wrap;
 }
 
 .settings-actions {
   display: flex;
-  gap: 12px;
-  margin-top: 24px;
-  padding-top: 16px;
-  border-top: 1px solid var(--border-color, #333);
-}
-
-.reset-btn {
-  padding: 8px 16px;
-  background: transparent;
-  border: 1px solid var(--border-color, #444);
-  color: var(--text-color, #fff);
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 13px;
-}
-
-.reset-btn:hover {
-  background: var(--hover-bg, #333);
-}
-
-.save-btn:disabled {
-  opacity: 0.7;
-  cursor: not-allowed;
+  gap: 8px;
+  padding: 16px 16px 0;
+  flex-wrap: wrap;
 }
 
 .loading-state {
-  text-align: center;
-  padding: 40px;
-  color: var(--text-secondary, #888);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 80px;
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+
+/* ─── Download header ────────────────────────────────────────────── */
+.download-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.download-ext-badge {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 2px 5px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.download-filename-wrap {
+  flex: 1;
+  min-width: 0;
+}
+
+.download-item-actions {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.paused-badge {
+  color: var(--warning);
 }
