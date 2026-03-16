@@ -38,7 +38,9 @@ export class AdBlockManager {
     this.cacheDir = path.join(app.getPath('userData'), 'adblock')
     try {
       fs.mkdirSync(this.cacheDir, { recursive: true })
-    } catch {}
+    } catch {
+      /* empty */
+    }
   }
 
   // ── Rule Parser ────────────────────────────────────────────────
@@ -176,11 +178,13 @@ export class AdBlockManager {
       if (Date.now() - stat.mtimeMs < maxAge) {
         return fs.readFileSync(filePath, 'utf8')
       }
-    } catch {}
+    } catch {
+      /* empty */
+    }
 
     // Fetch fresh
     return new Promise((resolve) => {
-      const fallback = () => {
+      const fallback = (): string => {
         try {
           return fs.readFileSync(filePath, 'utf8')
         } catch {
@@ -194,7 +198,9 @@ export class AdBlockManager {
         res.on('end', () => {
           try {
             fs.writeFileSync(filePath, data, 'utf8')
-          } catch {}
+          } catch {
+            /* empty */
+          }
           resolve(data)
         })
         res.on('error', () => resolve(fallback()))
@@ -318,7 +324,9 @@ export class AdBlockManager {
   detachFromSession(sess: Electron.Session): void {
     try {
       sess.webRequest.onBeforeRequest(null)
-    } catch {}
+    } catch {
+      /* empty */
+    }
   }
 
   // ── Enable/disable ────────────────────────────────────────────
@@ -351,7 +359,9 @@ export class AdBlockManager {
     for (const cb of this.statsListeners) {
       try {
         cb(this.blockedCount)
-      } catch {}
+      } catch {
+        /* empty */
+      }
     }
   }
 
@@ -368,7 +378,9 @@ export class AdBlockManager {
       try {
         const file = path.join(app.getPath('userData'), 'adblock-enabled.json')
         fs.writeFileSync(file, JSON.stringify({ enabled: value }))
-      } catch {}
+      } catch {
+        /* empty */
+      }
     })
 
     ipcMain.handle('adblock:get-count', () => this.getBlockedCount())
