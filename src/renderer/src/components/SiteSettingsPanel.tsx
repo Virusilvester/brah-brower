@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, JSX } from 'react'
 import type { SitePermissions, PermissionValue, SiteSettings } from '../../../preload/index.d'
 import '../styles/Panel.css'
-import '../styles/SiteSettings.css'
+import '../styles/Sitesettings.css'
 
 interface SiteSettingsPanelProps {
   url: string
@@ -155,7 +155,7 @@ function PermissionRow({
   value: PermissionValue
   defaultValue: PermissionValue
   onChange: (v: PermissionValue) => void
-}) {
+}): JSX.Element {
   const isCustom = value !== defaultValue
   return (
     <div className={`permission-row ${isCustom ? 'customized' : ''}`}>
@@ -217,7 +217,7 @@ export function SiteSettingsPanel({ url, onClose }: SiteSettingsPanelProps): JSX
       return
     }
 
-    const load = async () => {
+    const load = async (): Promise<void> => {
       try {
         const [site, defs] = await Promise.all([
           window.siteSettings?.get(origin),
@@ -280,7 +280,9 @@ export function SiteSettingsPanel({ url, onClose }: SiteSettingsPanelProps): JSX
     try {
       await window.siteSettings?.reset(origin)
       setSiteData({ origin, permissions: {} })
-    } catch {}
+    } catch {
+      /* empty */
+    }
   }, [origin, domain])
 
   const hasCustomPermissions = siteData
